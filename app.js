@@ -1,7 +1,7 @@
 import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
-import { authRoute, addressRoute, contactRoute, timerRoute } from "./routes/index.js";
+import { authRoute, addressRoute, contactRoute, timerRoute, userRoute } from "./routes/index.js";
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 
@@ -36,7 +36,7 @@ app.use("/users", authRoute);
 app.use("/contacts", contactRoute);
 app.use("/address", addressRoute);
 app.use("/timer", timerRoute)
-
+app.use("/users", userRoute)
 // Global error handler
 
 app.use(errorHandler)
