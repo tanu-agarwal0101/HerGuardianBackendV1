@@ -19,6 +19,7 @@ model User {
   refreshTokens      RefreshToken[]
   verificationTokens VerificationToken[]
   safetyTimers       SafetyTimer[]
+  sosAlerts          SOSAlert[]
   stealthMode        Boolean             @default(false)
   stealthType        String?
   createdAt          DateTime            @default(now())
@@ -99,6 +100,19 @@ model SafetyTimer {
   updatedAt      DateTime @updatedAt
 }
 
+model SOSAlert {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  userId String @db.ObjectId
+  user   User   @relation(fields: [userId], references: [id])
+
+  latitude    Float
+  longitude   Float
+  triggeredAt DateTime @default(now())
+  resolved    Boolean  @default(false)
+
+  @@index([userId])
+}
 
 // npx prisma format
 // npx prisma reset
