@@ -1,5 +1,6 @@
 import Cron from "node-cron";
 import prisma from "../utils/prisma.js";
+import { sendSOSMail } from "../utils/emailService.js";
 
 Cron.schedule("* * * * *", async () => {
   const now = new Date();
@@ -24,7 +25,7 @@ Cron.schedule("* * * * *", async () => {
         where: { id: timer.id },
         data: {
           isActive: false,
-          status: "escalated", 
+          status: "escalated",
         },
       });
 
@@ -42,13 +43,26 @@ Cron.schedule("* * * * *", async () => {
         },
       });
 
-      // Step 3: Notify Contacts (optional)
+      // Step 3: Notify Contacts (send real emails)
       for (const contact of contacts) {
-        console.log(
-          `🚨 Escalated SOS: Notify ${contact.name} at ${contact.email || contact.phoneNumber}`
-        );
-        // Send email logic if you want
+        if (contact.email) {
+          try {
+            console.log(`Sending SOS email to ${contact.email}...`);
+            await sendSOSMail({
+              to: contact.email,
+              userName: user.firstName || user.email || "User",
+              locationUrl: `https://maps.google.com/?q=${timer.latitude || 0},${timer.longitude || 0}`,
+              triggeredAt: timer.expiresAt.toLocaleString(),
+            });
+            console.log(`SOS email sent to ${contact.email}`);
+          } catch (e) {
+            console.error(`Failed to send SOS email to ${contact.email}:`, e);
+          }
+        }
       }
+      console.log(
+        `All SOS emails sent for user ${user.email || user.id} (timer ${timer.id})`
+      );
     }
   } catch (e) {
     console.error("Cron Job error", e);
