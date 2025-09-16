@@ -1,5 +1,46 @@
-./node_modules
-# Keep environment variables out of version control
+## Dependencies
+node_modules/
+
+## Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+## Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+## Coverage
+coverage/
+.nyc_output/
+
+## Environment files
 .env
-coverage
-node_modules
+.env.local
+.env.development
+.env.production
+.env.test
+
+## Cache/Temp
+.cache/
+.tmp/
+tmp/
+
+## OS/Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+## Build output (if any)
+dist/
+build/
+
+## Public uploads (uncomment if you store runtime uploads here)
+# public/uploads/
