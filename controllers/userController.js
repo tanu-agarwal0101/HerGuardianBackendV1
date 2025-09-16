@@ -24,7 +24,6 @@ const updateStealth = asyncHandler(async (req, res) => {
     },
   });
 
-  // ✅ Set non-HttpOnly cookies so frontend + middleware can read them
   res.clearCookie("stealthMode", {
     path: "/",
     sameSite: "Strict",
@@ -107,7 +106,7 @@ const getProfile = asyncHandler(async (req, res) => {
     return res.status(statusCode.NotFound404).json({ message: "User not found" });
   }
 
-  // 🔐 Safe user object (exclude password and token fields)
+
   const safeUser = {
     id: user.id,
     email: user.email,
@@ -117,12 +116,12 @@ const getProfile = asyncHandler(async (req, res) => {
     stealthMode: user.stealthMode,
     stealthType: user.stealthType,
     safetyTimer: user.safetyTimer,
-    addresses: user.address, // <- match your frontend interface
-    contacts: user.emergencyContacts, // <- match frontend naming
+    addresses: user.address,
+    contacts: user.emergencyContacts,
     sosTriggers: user.sosAlerts,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    // profilePicture: null, // optional: add if needed
+    // profilePicture: null, 
   };
 
   return res.status(statusCode.Ok200).json({ user: safeUser });

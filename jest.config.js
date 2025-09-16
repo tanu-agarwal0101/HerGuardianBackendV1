@@ -1,7 +1,7 @@
 export default {
   testEnvironment: "node",
-  transform: {},
-  moduleFileExtensions: ["js", "json"],
+  transform: {}, // no transform needed for plain JS ESM
+  moduleFileExtensions: ["js", "json", "mjs"],
   verbose: false,
   testMatch: ["**/__tests__/**/*.test.js"],
   collectCoverageFrom: [
@@ -9,7 +9,7 @@ export default {
     "middleware/**/*.js",
     "routes/**/*.js",
     "utils/**/*.js",
-    "app.js"
+    "app.js",
   ],
   coverageThreshold: {
     global: {
@@ -19,6 +19,5 @@ export default {
       functions: 0.8,
     },
   },
+  // extensionsToTreatAsEsm removed completely
 };
-
-
