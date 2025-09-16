@@ -1,4 +1,4 @@
-// ESM-friendly Jest mocks must be set up before importing the app
+
 import { jest } from '@jest/globals';
 const mockPrisma = {
   user: {
@@ -83,7 +83,7 @@ describe('Auth flows and protected route', () => {
   test('GET /users/profile -> requires auth cookie and returns profile', async () => {
     mockPrisma.blackListToken.findFirst.mockResolvedValueOnce(null);
     mockPrisma.user.findUnique
-      .mockResolvedValueOnce({ id: 'user-1', email: 'user@example.com' }) // auth middleware lookup
+      .mockResolvedValueOnce({ id: 'user-1', email: 'user@example.com' })
       .mockResolvedValueOnce({
         id: 'user-1',
         email: 'user@example.com',

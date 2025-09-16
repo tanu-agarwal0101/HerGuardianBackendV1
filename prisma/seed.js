@@ -48,7 +48,7 @@ async function seed() {
     users.push(created);
   }
 
-  // Addresses and contacts per user
+  
   for (const user of users) {
     // Addresses
     await prisma.address.createMany({

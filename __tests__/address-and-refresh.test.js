@@ -1,6 +1,6 @@
 import { jest } from '@jest/globals';
 
-// Shared mocks
+
 const mockPrisma = {
   user: {
     findUnique: jest.fn(),

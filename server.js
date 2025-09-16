@@ -5,6 +5,7 @@ import http from "http"
 import chatBotSocket from "./routes/chatbotRoutes.js"
 import prisma from "./utils/prisma.js";
 // import "./jobs/safetyTimerChecker.js"
+import { startWatchSimulator, stopWatchSimulator } from "./jobs/watchSimulator.js";
 
 
 dotenv.config();
@@ -41,11 +42,15 @@ chatBotSocket(io)
 
 server.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
+  if (process.env.SIMULATE_WATCH === "true") {
+    startWatchSimulator();
+  }
 });
 
 const shutdown = async (signal) => {
   try {
     console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    stopWatchSimulator();
     server.close(async () => {
       console.log("HTTP server closed.");
       await prisma.$disconnect().catch(() => {});

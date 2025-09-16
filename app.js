@@ -61,57 +61,5 @@ app.use("/watch", watchRoute)
 // Global error handler
 
 app.use(errorHandler)
-// app.use((err, req, res, next) => {
-//     console.error(err.stack);
-  
-//     const errorResponse = {
-//       error: err.name || "Error",
-//       message: err.message || "Internal Server Error",
-//     };
-  
-//     switch (err.name) {
-//       case "TokenExpiredError":
-//         return res.status(401).json({
-//           error: "Unauthorized",
-//           message: "Token expired, please log in again.",
-//         });
-  
-//       case "JsonWebTokenError":
-//         return res
-//           .status(401)
-//           .json({ error: "Unauthorized", message: "Invalid token" });
-  
-//       case "ValidationError":
-//         return res.status(400).json({
-//           error: "Bad Request",
-//           message: "Validation error",
-//           details: err.errors,
-//         });
-  
-//       case "NotFoundError":
-//         return res
-//           .status(404)
-//           .json({ error: "Not Found", message: "Resource not found" });
-  
-//       case "UnauthorizedError":
-//         return res
-//           .status(401)
-//           .json({ error: "Unauthorized", message: "Unauthorized access" });
-  
-//       case "CastError":
-//         return res
-//           .status(400)
-//           .json({ error: "Bad Request", message: "Invalid ID format" });
-  
-//     //   case "RateLimitExceeded":
-//     //     return res.status(429).json({
-//     //       error: "Too Many Requests",
-//     //       message: "Too many requests. Please try again later.",
-//     //     });
-  
-//       default:
-//         return res.status(err.status || 500).json(errorResponse);
-//     }
-//   });
 
 export default app

@@ -46,7 +46,7 @@ describe('authMiddleware error paths', () => {
 
   test('403 when access expired and refresh expired too', async () => {
     mockPrisma.blackListToken.findFirst.mockResolvedValueOnce(null);
-    // First verify throws TokenExpiredError (access), second verify throws for refresh
+    
     mockJwt.verify
       .mockImplementationOnce(() => { const e = new Error('expired'); e.name = 'TokenExpiredError'; throw e; })
       .mockImplementationOnce(() => { const e = new Error('expired'); e.name = 'TokenExpiredError'; throw e; });

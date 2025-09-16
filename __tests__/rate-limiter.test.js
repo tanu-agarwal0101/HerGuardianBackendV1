@@ -8,7 +8,6 @@ describe('Rate limiter basic behavior (smoke)', () => {
     const res = await request(app)
       .post('/users/sos-trigger')
       .send({ latitude: 1, longitude: 2 });
-    // We cannot assert 429 without deep setup; ensure not blocked by default
     expect([200, 400, 401]).toContain(res.status);
   });
 });
