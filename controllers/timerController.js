@@ -7,8 +7,8 @@ import { checkUserId } from "../utils/validators.js";
 
 const startSafetyTimer = asyncHandler(async(req, res)=>{
     // console.log("timer", req.user)
-    const userId = req.user?.userId || "685adacd518c5024073cb612"
-    const { duration, shareLocation} = req.body  || "685adacd518c5024073cb612";
+    const userId = req.user?.userId
+    const { duration, shareLocation, latitude, longitude} = req.body
     const expiresAt = new Date(Date.now() + duration*60*1000) //min to ms
 
     // const isUserIdValid = await checkUserId(userId);
@@ -18,6 +18,10 @@ const startSafetyTimer = asyncHandler(async(req, res)=>{
     //         })
     //     }
 
+    if(!(await checkUserId(userId))){
+        return res.status(statusCode.BadRequest400).json({message: "invalid user id"})
+    }
+
     const timer = await prisma.safetyTimer.create({
         data:{
             userId,
@@ -25,6 +29,8 @@ const startSafetyTimer = asyncHandler(async(req, res)=>{
             expiresAt,
             sharedLocation: shareLocation,
             isActive : true,
+            latitude,
+            longitude
         }
     })
 
@@ -54,13 +60,15 @@ const startSafetyTimer = asyncHandler(async(req, res)=>{
 
 const cancelSafetyTimer = asyncHandler(async(req, res)=>{
     const userId = req.user?.userId;
+    const {status} = req.body;
     const updatedTimer = await prisma.safetyTimer.updateMany({
         where:{
             userId,
             isActive: true,
         },
         data:{
-            isActive: false
+            isActive: false,
+            status
         }
     })
 

@@ -147,7 +147,6 @@ const loginUser = asyncHandler(async (req, res) => {
 const logoutUser = asyncHandler(async (req, res) => {
   const accessToken = req.cookies?.accessToken;
   const refreshToken = req.cookies?.refreshToken;
-
   if (accessToken) {
     await prisma.blackListToken.create({
       data: {
@@ -166,7 +165,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 
   res.clearCookie("accessToken", cookieOptions);
   res.clearCookie("refreshToken", cookieOptions);
-
+  console.log("logged out successfully")
   return res.status(statusCode.Ok200).json({
     message: "user logged out successfully",
   });

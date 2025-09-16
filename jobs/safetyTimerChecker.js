@@ -2,43 +2,55 @@ import Cron from "node-cron";
 import prisma from "../utils/prisma.js";
 
 Cron.schedule("* * * * *", async () => {
-    const now = new Date();
-    try{
-        const expiredTimers = await prisma.safetyTimer.findMany({
-            where:{
-                isActive: true,
-                expiresAt: {
-                    lte: now,
-                }
-            },
-            include:{
-                user:{
-                    user: {
-                        include:{
-                            emergencyContacts: true
-                        }
-                    }
-                }
-            }
-        })
-        
-        for (const timer of expiredTimers){
-            // 1. mark timer inactive
-            await prisma.safetyTimer.update({
-                where: {id: timer.id},
-                data: {isActive: false}
-            })
+  const now = new Date();
+  try {
+    const expiredTimers = await prisma.safetyTimer.findMany({
+      where: {
+        isActive: true,
+        expiresAt: { lte: now },
+      },
+      include: {
+        user: {
+          include: {
+            emergencyContacts: true,
+          },
+        },
+      },
+    });
 
-            // 2. get emergency contacts
-            const contacts = timer.user.emergencyContacts;
+    for (const timer of expiredTimers) {
+      // Step 1: Mark timer as escalated
+      await prisma.safetyTimer.update({
+        where: { id: timer.id },
+        data: {
+          isActive: false,
+          status: "escalated", 
+        },
+      });
 
-            // 3. send alert
-            console.log(`Safety Alert for ${timer.user.email}`)
-            for(const contact of contacts){
-                console.log(`Notify ${contact.name} with ${contact.phoneNumber} that user hasnt checked in`)
-            }
-        }
-    } catch (e){
-        console.error("Cron Job error", e)
+      const user = timer.user;
+      const contacts = user.emergencyContacts;
+
+      // Step 2: Trigger SOS Alert
+      const sos = await prisma.sOSAlert.create({
+        data: {
+          userId: user.id,
+          latitude: timer.latitude || 0,
+          longitude: timer.longitude || 0,
+          triggeredAt: new Date(),
+          resolved: false,
+        },
+      });
+
+      // Step 3: Notify Contacts (optional)
+      for (const contact of contacts) {
+        console.log(
+          `🚨 Escalated SOS: Notify ${contact.name} at ${contact.email || contact.phoneNumber}`
+        );
+        // Send email logic if you want
+      }
     }
-})
+  } catch (e) {
+    console.error("Cron Job error", e);
+  }
+});
