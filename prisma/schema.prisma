@@ -96,6 +96,9 @@ model SafetyTimer {
   expiresAt      DateTime
   isActive       Boolean  @default(true)
   sharedLocation Boolean  @default(true)
+  status         String   @default("active") // active, expired, cancelled
+  latitude       Float?
+  longitude      Float?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
