@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import {Server} from "socket.io"
 import http from "http"
 import chatBotSocket from "./routes/chatbotRoutes.js"
+import prisma from "./utils/prisma.js";
 // import "./jobs/safetyTimerChecker.js"
 
 
@@ -41,3 +42,26 @@ chatBotSocket(io)
 server.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
 });
+
+const shutdown = async (signal) => {
+  try {
+    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    server.close(async () => {
+      console.log("HTTP server closed.");
+      await prisma.$disconnect().catch(() => {});
+      process.exit(0);
+    });
+    // Force exit if not closed in time
+    setTimeout(async () => {
+      await prisma.$disconnect().catch(() => {});
+      console.warn("Forcing shutdown.");
+      process.exit(1);
+    }, 10_000).unref();
+  } catch (err) {
+    console.error("Error during shutdown", err);
+    process.exit(1);
+  }
+};
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
