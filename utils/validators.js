@@ -1,4 +1,5 @@
 import { ZodError } from "zod";
+import prisma from "./prisma.js";
 
 export const validatePassword = (password) => {
     if (!password) {
