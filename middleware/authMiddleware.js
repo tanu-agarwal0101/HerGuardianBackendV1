@@ -20,7 +20,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
     })
     
     if(blacklistedToken){
-        return res.status(statusCode.Unauthorized401),json({
+        return res.status(statusCode.Unauthorized401).json({
             message: "Token is blacklisted"
         })
     }
