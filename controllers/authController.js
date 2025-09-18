@@ -4,80 +4,92 @@ import jwt from "jsonwebtoken";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { statusCode } from "../utils/statusCode.js";
 
-const cookieOptions = {
+const baseCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "Strict",
+  path: "/",
 };
 // import { ObjectId } from "mongodb";
 
-const generateTokens = async (user, rememberMe=false) => {
-    const parseExpiry = (envVar, fallback) => {
-  const trimmed = (envVar || '').trim();
-  return trimmed || fallback;
-}
+// Helpers for ms parsing
+const min = (n) => n * 60 * 1000;
+const hr = (n) => n * 60 * 60 * 1000;
+const day = (n) => n * 24 * 60 * 60 * 1000;
+const parseMs = (val, fallback) => {
+  const v = (val || "").trim() || fallback;
+  const num = parseInt(v);
+  if (v.endsWith("m")) return min(num);
+  if (v.endsWith("h")) return hr(num);
+  if (v.endsWith("d")) return day(num);
+  return num; // assume milliseconds
+};
 
- const accessExpiry = parseExpiry(process.env.ACCESS_TOKEN_EXPIRY, "1d"); // e.g., "1d"
-  const refreshExpiry = parseExpiry(process.env.REFRESH_TOKEN_EXPIRY, rememberMe ? "30d" : "2h"); 
+// Configurable (with fallbacks)
+const ACCESS_EXP_MS = parseMs(process.env.ACCESS_TOKEN_EXPIRY, "15m");
+const SHORT_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_SHORT_EXPIRY, "2h");
+const LONG_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_LONG_EXPIRY, "30d");
+const LONG_REFRESH_CAP_MS = parseMs(process.env.REFRESH_TOKEN_LONG_CAP, "90d");
 
-  const getMsFromExpiry = (expiryStr) => {
-    const num = parseInt(expiryStr);
-    if (expiryStr.endsWith("d")) return num * 24 * 60 * 60 * 1000;
-    if (expiryStr.endsWith("h")) return num * 60 * 60 * 1000;
-    if (expiryStr.endsWith("m")) return num * 60 * 1000;
-    return num; 
-  };
-
-  const refreshMaxAgeMs = getMsFromExpiry(refreshExpiry); // for cookie maxAge
-  const expiresAt = new Date(Date.now() + refreshMaxAgeMs); // for DB
-
-  const accessToken = jwt.sign(
-    {
-      userId: user.id,
-      email: user.email,
-    },
+const signAccess = (user) =>
+  jwt.sign(
+    { userId: user.id, email: user.email },
     process.env.ACCESS_TOKEN_SECRET,
     {
-      expiresIn: accessExpiry,
+      expiresIn: Math.floor(ACCESS_EXP_MS / 1000),
     }
   );
-
-  const refreshToken = jwt.sign(
-    {
-      userId: user.id,
-      email: user.email,
-    },
+const signRefresh = (user, durationMs) =>
+  jwt.sign(
+    { userId: user.id, email: user.email },
     process.env.REFRESH_TOKEN_SECRET,
     {
-      expiresIn: refreshExpiry,
+      expiresIn: Math.floor(durationMs / 1000),
     }
   );
 
-  // const createdAt = new Date();
-  // const expiresAt = new Date();
-  // expiresAt.setDate(createdAt.getDate() + 10);
-
+const generateTokens = async (
+  user,
+  rememberMe = false,
+  userAgent = null,
+  ip = null
+) => {
+  const refreshWindowMs = rememberMe ? LONG_REFRESH_MS : SHORT_REFRESH_MS;
+  const accessToken = signAccess(user);
+  const refreshToken = signRefresh(user, refreshWindowMs);
+  const now = Date.now();
+  const expiresAt = new Date(now + refreshWindowMs);
+  const initialIssuedAt = new Date();
   await prisma.refreshToken.create({
     data: {
       token: refreshToken,
       userId: user.id,
       createdAt: new Date(),
       expiresAt,
+      initialIssuedAt,
+      rememberMe,
+      userAgent: userAgent || undefined,
+      ip: ip || undefined,
     },
   });
-
-  return { accessToken, refreshToken, refreshMaxAgeMs, // optionally return maxAge for cookie
-    expiresAt, };
+  return {
+    accessToken,
+    refreshToken,
+    refreshWindowMs,
+    expiresAt,
+    initialIssuedAt,
+  };
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-    // console.log("data", req.body)
+  // console.log("data", req.body)
   const { email, password, rememberMe } = req.validateData;
+  const normalizedEmail = email.trim().toLowerCase();
 
-  console.log("email", email, password)
+  console.log("register email", normalizedEmail);
 
   const existingUser = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
   if (existingUser) {
     return res
@@ -85,38 +97,63 @@ const registerUser = asyncHandler(async (req, res) => {
       .json({ message: "User already exists" });
   }
   const hashedPassword = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({
-    data: {
-      email,
-      password: hashedPassword,
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        password: hashedPassword,
+      },
+    });
+  } catch (e) {
+    if (e.code === "P2002") {
+      return res
+        .status(statusCode.Conflict409)
+        .json({ message: "User already exists" });
+    }
+    throw e;
+  }
 
-  const { accessToken, refreshToken, refreshMaxAgeMs, expiresAt, } = await generateTokens(user, rememberMe);
+  const ua = req.headers["user-agent"] || null;
+  const ip = req.ip || req.connection?.remoteAddress || null;
+  const { accessToken, refreshToken, refreshWindowMs } = await generateTokens(
+    user,
+    rememberMe,
+    ua,
+    ip
+  );
 
   return res
     .status(statusCode.Created201)
-    .cookie("accessToken", accessToken,cookieOptions)
-    .cookie("refreshToken", refreshToken, {...cookieOptions,
-      path: "/",
-      maxAge: refreshMaxAgeMs
+    .cookie("accessToken", accessToken, {
+      ...baseCookieOptions,
+      maxAge: ACCESS_EXP_MS,
+    })
+    .cookie("refreshToken", refreshToken, {
+      ...baseCookieOptions,
+      maxAge: refreshWindowMs,
+    })
+    .cookie("rememberMe", rememberMe ? "true" : "false", {
+      ...baseCookieOptions,
+      maxAge: refreshWindowMs,
     })
     .json({
       message: "User created successfully",
       user: { id: user.id, email: user.email },
+      expiresIn: ACCESS_EXP_MS / 1000,
     });
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-    
   const { email, password, rememberMe } = req.validateData;
-  if (!email || !password) {
+  const normalizedEmail = email?.trim().toLowerCase();
+  if (!normalizedEmail || !password) {
     return res
       .status(statusCode.BadRequest400)
       .json({ message: "Email and password are required" });
   }
   const user = await prisma.user.findUnique({
-    where: { email },
+    where: { email: normalizedEmail },
   });
   if (!user)
     return res.status(statusCode.NotFound404).json({
@@ -129,18 +166,38 @@ const loginUser = asyncHandler(async (req, res) => {
       message: "Invalid password",
     });
   }
-  const { accessToken, refreshToken,refreshMaxAgeMs, expiresAt, } = await generateTokens(user, rememberMe);
-//   console.log(generateTokens(user))
+  const ua = req.headers["user-agent"] || null;
+  const ip = req.ip || req.connection?.remoteAddress || null;
+  const { accessToken, refreshToken, refreshWindowMs } = await generateTokens(
+    user,
+    rememberMe,
+    ua,
+    ip
+  );
+  //   console.log(generateTokens(user))
   return res
     .status(statusCode.Ok200)
-    .cookie("accessToken", accessToken, cookieOptions)
-    .cookie("refreshToken", refreshToken, {...cookieOptions,
-      path: "/",
-      maxAge: refreshMaxAgeMs
+    .cookie("accessToken", accessToken, {
+      ...baseCookieOptions,
+      maxAge: ACCESS_EXP_MS,
+    })
+    .cookie("refreshToken", refreshToken, {
+      ...baseCookieOptions,
+      maxAge: refreshWindowMs,
+    })
+    .cookie("rememberMe", rememberMe ? "true" : "false", {
+      ...baseCookieOptions,
+      maxAge: refreshWindowMs,
     })
     .json({
       message: "User logged in successfully",
-      user: {email: user.email, phoneNumber: user.phoneNumber, firstName: user.firstName, lastName: user.lastName},
+      user: {
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+      expiresIn: ACCESS_EXP_MS / 1000,
     });
 });
 
@@ -163,21 +220,22 @@ const logoutUser = asyncHandler(async (req, res) => {
     });
   }
 
-  res.clearCookie("accessToken", cookieOptions);
-  res.clearCookie("refreshToken", cookieOptions);
-  console.log("logged out successfully")
+  res.clearCookie("accessToken", baseCookieOptions);
+  res.clearCookie("refreshToken", baseCookieOptions);
+  res.clearCookie("rememberMe", baseCookieOptions);
+  console.log("logged out successfully");
   return res.status(statusCode.Ok200).json({
     message: "user logged out successfully",
   });
 });
 
 const onboardUser = asyncHandler(async (req, res) => {
-    // console.log("data", req.validateData)
+  // console.log("data", req.validateData)
   const { firstName, lastName, phoneNumber } = req.body;
-  console.log("req", req.user)
+  console.log("req", req.user);
   const userId = req.user?.userId;
-//   console.log("userId before casting:", userId)
-// console.log("isValidObjectId:", ObjectId.isValid(userId))
+  //   console.log("userId before casting:", userId)
+  // console.log("isValidObjectId:", ObjectId.isValid(userId))
   if (!firstName || !lastName || !phoneNumber) {
     return res
       .status(statusCode.BadRequest400)
@@ -221,34 +279,97 @@ const onboardUser = asyncHandler(async (req, res) => {
     .json({ message: "User updated successfully", user: sanitizedUser });
 });
 
-const refreshTokenHandler = asyncHandler(async(req, res)=>{
+const refreshTokenHandler = asyncHandler(async (req, res) => {
   const token = req.cookies.refreshToken;
-  if(!token) return res.status(statusCode.Unauthorized401).json({
-    message: "token not found"
-  })
+  if (!token)
+    return res
+      .status(statusCode.Unauthorized401)
+      .json({ message: "token not found" });
+
+  const existing = await prisma.refreshToken.findUnique({ where: { token } });
+  if (!existing || existing.revoked)
+    return res
+      .status(statusCode.Forbidden403)
+      .json({ message: "Invalid or revoked refresh token" });
 
   try {
-    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET)
-  
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
     const user = await prisma.user.findUnique({
-      where: {id: decoded.userId}
-    })
-  
-    if(!user) return res.status(statusCode.NotFound404).json({message: "user not found"})
-  
-    const newAccessToken = jwt.sign({
-      userId: user.id, email: user.email
-    },
-    process.env.ACCESS_TOKEN_SECRET,{
-      expiresIn: process.env.ACCESS_TOKEN_EXPIRY || "1d"
-    })
-  
-    res.cookie("accessToken", newAccessToken, cookieOptions
-    )
-    return res.status(statusCode.Ok200).json({ message: "Access token refreshed" })
-  } catch (error) {
-    return res.status(statusCode.Forbidden403).json({message: "Invalid token"})
-  }
-})
+      where: { id: decoded.userId },
+    });
+    if (!user)
+      return res
+        .status(statusCode.NotFound404)
+        .json({ message: "user not found" });
 
-export { registerUser, loginUser, logoutUser, onboardUser, refreshTokenHandler };
+    const now = Date.now();
+    if (existing.expiresAt.getTime() < now)
+      return res
+        .status(statusCode.Forbidden403)
+        .json({ message: "refresh expired" });
+
+    // Determine new window (sliding for rememberMe)
+    let refreshWindowMs = existing.rememberMe
+      ? LONG_REFRESH_MS
+      : SHORT_REFRESH_MS;
+    let newExpiresAt = new Date(now + refreshWindowMs);
+    if (existing.rememberMe) {
+      const capAt = existing.initialIssuedAt.getTime() + LONG_REFRESH_CAP_MS;
+      if (newExpiresAt.getTime() > capAt) newExpiresAt = new Date(capAt);
+    }
+
+    // Revoke old token
+    await prisma.refreshToken.update({
+      where: { token },
+      data: { revoked: true, revokedAt: new Date() },
+    });
+
+    const accessToken = signAccess(user);
+    const newRefreshToken = signRefresh(user, newExpiresAt.getTime() - now);
+    await prisma.refreshToken.create({
+      data: {
+        token: newRefreshToken,
+        userId: user.id,
+        createdAt: new Date(),
+        expiresAt: newExpiresAt,
+        initialIssuedAt: existing.initialIssuedAt,
+        rotatedFrom: existing.id,
+        rememberMe: existing.rememberMe,
+        userAgent: req.headers["user-agent"] || undefined,
+        ip: req.ip || req.connection?.remoteAddress || undefined,
+      },
+    });
+
+    res
+      .cookie("accessToken", accessToken, {
+        ...baseCookieOptions,
+        maxAge: ACCESS_EXP_MS,
+      })
+      .cookie("refreshToken", newRefreshToken, {
+        ...baseCookieOptions,
+        maxAge: newExpiresAt.getTime() - now,
+      })
+      .cookie("rememberMe", existing.rememberMe ? "true" : "false", {
+        ...baseCookieOptions,
+        maxAge: newExpiresAt.getTime() - now,
+      });
+
+    return res.status(statusCode.Ok200).json({
+      accessToken,
+      refreshToken: newRefreshToken,
+      expiresIn: ACCESS_EXP_MS / 1000,
+    });
+  } catch (err) {
+    return res
+      .status(statusCode.Forbidden403)
+      .json({ message: "Invalid token" });
+  }
+});
+
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  onboardUser,
+  refreshTokenHandler,
+};

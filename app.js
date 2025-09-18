@@ -55,7 +55,7 @@ app.get("/", (req, res) => {
   res.send("<h1>Welcome to HerGuardian</h1>");
 });
 
-app.get("/healthz", (req, res) => {
+app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });
 });
 
