@@ -22,6 +22,8 @@ model User {
   sosAlerts          SOSAlert[]
   stealthMode        Boolean             @default(false)
   stealthType        String?
+  dashboardPass      String?
+  sosPass            String?
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -32,9 +34,17 @@ model RefreshToken {
   userId    String   @db.ObjectId
   createdAt DateTime @default(now())
   expiresAt DateTime
+  initialIssuedAt DateTime @default(now())
+  rotatedFrom String? @db.ObjectId
+  revoked   Boolean  @default(false)
+  revokedAt DateTime?
+  rememberMe Boolean @default(false)
+  userAgent String?
+  ip        String?
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+  @@index([expiresAt])
 }
 
 model VerificationToken {

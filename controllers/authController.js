@@ -88,9 +88,22 @@ const registerUser = asyncHandler(async (req, res) => {
 
   console.log("register email", normalizedEmail);
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
+  let existingUser;
+  try {
+    existingUser = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+  } catch (e) {
+    if (
+      e?.code === "P2010" ||
+      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+    ) {
+      return res
+        .status(statusCode.ServiceUnavailable503)
+        .json({ message: "Database unreachable. Please try again shortly." });
+    }
+    throw e;
+  }
   if (existingUser) {
     return res
       .status(statusCode.Conflict409)
@@ -106,6 +119,14 @@ const registerUser = asyncHandler(async (req, res) => {
       },
     });
   } catch (e) {
+    if (
+      e?.code === "P2010" ||
+      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+    ) {
+      return res
+        .status(statusCode.ServiceUnavailable503)
+        .json({ message: "Database unreachable. Please try again shortly." });
+    }
     if (e.code === "P2002") {
       return res
         .status(statusCode.Conflict409)
@@ -116,12 +137,23 @@ const registerUser = asyncHandler(async (req, res) => {
 
   const ua = req.headers["user-agent"] || null;
   const ip = req.ip || req.connection?.remoteAddress || null;
-  const { accessToken, refreshToken, refreshWindowMs } = await generateTokens(
-    user,
-    rememberMe,
-    ua,
-    ip
-  );
+  let accessToken, refreshToken, refreshWindowMs;
+  try {
+    const toks = await generateTokens(user, rememberMe, ua, ip);
+    accessToken = toks.accessToken;
+    refreshToken = toks.refreshToken;
+    refreshWindowMs = toks.refreshWindowMs;
+  } catch (e) {
+    if (
+      e?.code === "P2010" ||
+      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+    ) {
+      return res
+        .status(statusCode.ServiceUnavailable503)
+        .json({ message: "Database unreachable. Please try again shortly." });
+    }
+    throw e;
+  }
 
   return res
     .status(statusCode.Created201)
@@ -152,9 +184,22 @@ const loginUser = asyncHandler(async (req, res) => {
       .status(statusCode.BadRequest400)
       .json({ message: "Email and password are required" });
   }
-  const user = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+  } catch (e) {
+    if (
+      e?.code === "P2010" ||
+      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+    ) {
+      return res
+        .status(statusCode.ServiceUnavailable503)
+        .json({ message: "Database unreachable. Please try again shortly." });
+    }
+    throw e;
+  }
   if (!user)
     return res.status(statusCode.NotFound404).json({
       message: "user with this mail does not exist",
@@ -168,12 +213,23 @@ const loginUser = asyncHandler(async (req, res) => {
   }
   const ua = req.headers["user-agent"] || null;
   const ip = req.ip || req.connection?.remoteAddress || null;
-  const { accessToken, refreshToken, refreshWindowMs } = await generateTokens(
-    user,
-    rememberMe,
-    ua,
-    ip
-  );
+  let accessToken, refreshToken, refreshWindowMs;
+  try {
+    const toks = await generateTokens(user, rememberMe, ua, ip);
+    accessToken = toks.accessToken;
+    refreshToken = toks.refreshToken;
+    refreshWindowMs = toks.refreshWindowMs;
+  } catch (e) {
+    if (
+      e?.code === "P2010" ||
+      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+    ) {
+      return res
+        .status(statusCode.ServiceUnavailable503)
+        .json({ message: "Database unreachable. Please try again shortly." });
+    }
+    throw e;
+  }
   //   console.log(generateTokens(user))
   return res
     .status(statusCode.Ok200)
@@ -223,6 +279,15 @@ const logoutUser = asyncHandler(async (req, res) => {
   res.clearCookie("accessToken", baseCookieOptions);
   res.clearCookie("refreshToken", baseCookieOptions);
   res.clearCookie("rememberMe", baseCookieOptions);
+  // Clear frontend-facing stealth cookies as well
+  res.clearCookie("stealthMode", {
+    ...baseCookieOptions,
+    httpOnly: false,
+  });
+  res.clearCookie("stealthType", {
+    ...baseCookieOptions,
+    httpOnly: false,
+  });
   console.log("logged out successfully");
   return res.status(statusCode.Ok200).json({
     message: "user logged out successfully",

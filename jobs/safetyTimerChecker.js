@@ -2,9 +2,29 @@ import Cron from "node-cron";
 import prisma from "../utils/prisma.js";
 import { sendSOSMail } from "../utils/emailService.js";
 
+let lastDbErrorLogAt = 0;
+const DB_ERROR_LOG_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function isDbHealthy() {
+  try {
+    // MongoDB connector supports $runCommandRaw for ping
+    await prisma.$runCommandRaw({ ping: 1 });
+    return true;
+  } catch (e) {
+    const now = Date.now();
+    if (now - lastDbErrorLogAt > DB_ERROR_LOG_INTERVAL_MS) {
+      console.error("Cron DB health check failed; skipping this cycle", e);
+      lastDbErrorLogAt = now;
+    }
+    return false;
+  }
+}
+
 Cron.schedule("* * * * *", async () => {
   const now = new Date();
   try {
+    const healthy = await isDbHealthy();
+    if (!healthy) return; // skip this cycle quietly
     const expiredTimers = await prisma.safetyTimer.findMany({
       where: {
         isActive: true,

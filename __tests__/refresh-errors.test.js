@@ -28,18 +28,18 @@ describe("refresh-token errors", () => {
   test("401 when refresh token missing", async () => {
     const res = await request(app).post("/users/refresh-token");
     expect(res.status).toBe(401);
-    expect(res.body.message).toBe("access token missing");
+    expect(res.body.message).toBe("token not found");
   });
 
-  test("404 when user not found", async () => {
+  test("403 when user not found (no such user for decoded token)", async () => {
     mockPrisma.user.findUnique.mockResolvedValueOnce(null);
 
     const res = await request(app)
       .post("/users/refresh-token")
       .set("Cookie", ["refreshToken=ok"]);
 
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe("access token missing");
+    expect(res.status).toBe(403);
+    expect(res.body.message).toBe("Invalid or revoked refresh token");
   });
 
   test("403 when refresh token invalid", async () => {
@@ -47,7 +47,7 @@ describe("refresh-token errors", () => {
       .post("/users/refresh-token")
       .set("Cookie", ["refreshToken=bad"]);
 
-    expect(res.status).toBe(401);
-    expect(res.body.message).toBe("access token missing");
+    expect(res.status).toBe(403);
+    expect(res.body.message).toBe("Invalid or revoked refresh token");
   });
 });
