@@ -7,7 +7,13 @@ import { triggerSOS } from "../utils/triggerSos.js";
 
 const updateStealth = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
-  const { stealthMode, stealthType } = req.body;
+  const {
+    stealthMode,
+    stealthType,
+    stealthPin,
+    stealthKeyword,
+    stealthGesture,
+  } = req.body;
 
   const isUserValid = await checkUserId(userId);
   if (!isUserValid) {
@@ -21,6 +27,9 @@ const updateStealth = asyncHandler(async (req, res) => {
     data: {
       stealthMode,
       stealthType,
+      stealthPin,
+      stealthKeyword,
+      stealthGesture,
     },
   });
 
@@ -40,6 +49,7 @@ const updateStealth = asyncHandler(async (req, res) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
     path: "/",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 
   res.cookie("stealthType", stealthType || "calculator", {
@@ -47,11 +57,31 @@ const updateStealth = asyncHandler(async (req, res) => {
     secure: process.env.NODE_ENV === "production",
     sameSite: "Strict",
     path: "/",
+    maxAge: 30 * 24 * 60 * 60 * 1000,
   });
 
   return res.status(statusCode.Ok200).json({
     message: "Stealth settings updated and cookies set",
   });
+});
+
+const getStealth = asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      stealthMode: true,
+      stealthType: true,
+      stealthPin: true,
+      stealthKeyword: true,
+      stealthGesture: true,
+    },
+  });
+  if (!user)
+    return res
+      .status(statusCode.NotFound404)
+      .json({ message: "user not found" });
+  return res.status(statusCode.Ok200).json({ stealth: user });
 });
 
 // const getProfile = asyncHandler(async (req, res) => {
@@ -89,7 +119,9 @@ const getProfile = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
 
   if (!userId) {
-    return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized" });
+    return res
+      .status(statusCode.Unauthorized401)
+      .json({ message: "Unauthorized" });
   }
 
   const user = await prisma.user.findUnique({
@@ -103,9 +135,10 @@ const getProfile = asyncHandler(async (req, res) => {
   });
 
   if (!user) {
-    return res.status(statusCode.NotFound404).json({ message: "User not found" });
+    return res
+      .status(statusCode.NotFound404)
+      .json({ message: "User not found" });
   }
-
 
   const safeUser = {
     id: user.id,
@@ -121,12 +154,11 @@ const getProfile = asyncHandler(async (req, res) => {
     sosTriggers: user.sosAlerts,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    // profilePicture: null, 
+    // profilePicture: null,
   };
 
   return res.status(statusCode.Ok200).json({ user: safeUser });
 });
-
 
 const getAllUsers = asyncHandler(async (req, res) => {
   const users = await prisma.user.findMany({
@@ -160,7 +192,7 @@ const getAllUsers = asyncHandler(async (req, res) => {
 //       longitude: parseFloat(longitude),
 //       triggeredAt: triggeredAt ? new Date(triggeredAt) : new Date(),
 //     },
-    
+
 //   });
 
 //   const user = await prisma.user.findUnique({
@@ -208,7 +240,6 @@ const getAllUsers = asyncHandler(async (req, res) => {
 //   });
 // });
 
-
 const sosTrigger = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const { latitude, longitude, triggeredAt } = req.body;
@@ -222,20 +253,23 @@ const sosTrigger = asyncHandler(async (req, res) => {
   res.status(201).json({ message: "sos triggered successfully", sos });
 });
 
-const getSOSLogs = asyncHandler(async(req,res)=>{
+const getSOSLogs = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
-  if(!(await checkUserId(userId))) return res.status(statusCode.Unauthorized401).json({message: "invalid user id"})
+  if (!(await checkUserId(userId)))
+    return res
+      .status(statusCode.Unauthorized401)
+      .json({ message: "invalid user id" });
 
   const sosLogs = await prisma.sOSAlert.findMany({
-    where: {userId: userId},
-    orderBy: { triggeredAt: "desc" }
-  })
+    where: { userId: userId },
+    orderBy: { triggeredAt: "desc" },
+  });
 
-  if(sosLogs.length === 0) return res.status(statusCode.Ok200).json({message: "no logs found"})
+  if (sosLogs.length === 0)
+    return res.status(statusCode.Ok200).json({ message: "no logs found" });
 
-  return res.status(statusCode.Ok200).json({sosLogs, message: "logs found"})
-})
-
+  return res.status(statusCode.Ok200).json({ sosLogs, message: "logs found" });
+});
 
 // resolved: true immediately
 // Right now, the alert is closed the second you create it.
@@ -243,5 +277,11 @@ const getSOSLogs = asyncHandler(async(req,res)=>{
 // data: { resolved: false }
 // and only update it later in a resolveSOS endpoint.
 
-
-export { updateStealth, getProfile, getAllUsers, sosTrigger, getSOSLogs };
+export {
+  updateStealth,
+  getProfile,
+  getAllUsers,
+  sosTrigger,
+  getSOSLogs,
+  getStealth,
+};
