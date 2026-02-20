@@ -4,7 +4,12 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import { statusCode } from "../utils/statusCode.js";
 
 const verifyAccessToken = asyncHandler(async(req, res, next)=>{
-    const token = req.cookies.accessToken;
+    let token = req.cookies.accessToken;
+
+    if (!token && req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
+        token = req.headers.authorization.split(" ")[1];
+    }
+
     if(!token){
         return res.status(statusCode.Unauthorized401).json({
             message: "access token missing"

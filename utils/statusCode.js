@@ -8,6 +8,7 @@ const Forbidden403 = 403;
 const NotFound404 = 404;
 const ServerError500 = 500;
 const Conflict409 = 409;
+const ServiceUnavailable503 = 503;
 
 export const statusCode = {
   Ok200,
@@ -20,4 +21,5 @@ export const statusCode = {
   NotFound404,
   ServerError500,
   Conflict409,
+  ServiceUnavailable503,
 };

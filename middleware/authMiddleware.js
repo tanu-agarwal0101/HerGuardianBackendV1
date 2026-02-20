@@ -30,6 +30,7 @@ const authMiddleware = asyncHandler(async (req, res, next) => {
             accessToken,
             process.env.ACCESS_TOKEN_SECRET,
         )
+        console.log("authMiddleware: decodedToken", decodedToken);
         req.user = decodedToken;
         return next();
     } catch (error) {

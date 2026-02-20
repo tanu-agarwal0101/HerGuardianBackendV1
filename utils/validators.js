@@ -65,6 +65,7 @@ export const validateSchema = (schema) => (req, res, next) => {
 };
 
 export const checkUserId = async (userId) => {
+  if (!userId) return false;
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });

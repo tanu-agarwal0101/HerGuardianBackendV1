@@ -14,7 +14,7 @@ import verifyAccessToken from "../middleware/verifyAccessTokenMiddleware.js";
 const router = Router();
 router.post("/register", validateSchema(registerSchema), registerUser);
 router.post("/login", validateSchema(loginSchema), loginUser);
-router.post("/logout", authMiddleware, logoutUser);
+router.post("/logout", logoutUser);
 // router.route("/logout").post(logoutUser);
 router.patch(
   "/onboard",

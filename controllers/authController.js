@@ -3,11 +3,12 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { statusCode } from "../utils/statusCode.js";
+import { randomUUID } from "crypto";
 
 const baseCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "Strict",
+  sameSite: "Lax", // Relaxed for localhost port differences
   path: "/",
 };
 // import { ObjectId } from "mongodb";
@@ -45,6 +46,7 @@ const signRefresh = (user, durationMs) =>
     process.env.REFRESH_TOKEN_SECRET,
     {
       expiresIn: Math.floor(durationMs / 1000),
+      jwtid: randomUUID(),
     }
   );
 
@@ -167,6 +169,7 @@ const registerUser = asyncHandler(async (req, res) => {
     })
     .cookie("rememberMe", rememberMe ? "true" : "false", {
       ...baseCookieOptions,
+      httpOnly: false,
       maxAge: refreshWindowMs,
     })
     .json({
@@ -179,17 +182,21 @@ const registerUser = asyncHandler(async (req, res) => {
 const loginUser = asyncHandler(async (req, res) => {
   const { email, password, rememberMe } = req.validateData;
   const normalizedEmail = email?.trim().toLowerCase();
+  
   if (!normalizedEmail || !password) {
     return res
       .status(statusCode.BadRequest400)
       .json({ message: "Email and password are required" });
   }
+
   let user;
   try {
     user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
     });
   } catch (e) {
+    console.error("LOGIN: DB Error finding user", e);
+    // ... existing error handling
     if (
       e?.code === "P2010" ||
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
@@ -200,27 +207,34 @@ const loginUser = asyncHandler(async (req, res) => {
     }
     throw e;
   }
-  if (!user)
+
+  if (!user) {
     return res.status(statusCode.NotFound404).json({
       message: "user with this mail does not exist",
     });
+  }
 
   const isPasswordValid = await bcrypt.compare(password, user.password);
+  
   if (!isPasswordValid) {
     return res.status(statusCode.BadRequest400).json({
       message: "Invalid password",
     });
   }
+
   const ua = req.headers["user-agent"] || null;
   const ip = req.ip || req.connection?.remoteAddress || null;
   let accessToken, refreshToken, refreshWindowMs;
+  
   try {
     const toks = await generateTokens(user, rememberMe, ua, ip);
     accessToken = toks.accessToken;
     refreshToken = toks.refreshToken;
     refreshWindowMs = toks.refreshWindowMs;
   } catch (e) {
-    if (
+    console.error("LOGIN: Error generating tokens", e);
+    // ... existing error handling
+      if (
       e?.code === "P2010" ||
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
     ) {
@@ -230,8 +244,9 @@ const loginUser = asyncHandler(async (req, res) => {
     }
     throw e;
   }
-  //   console.log(generateTokens(user))
-  return res
+
+  console.log("LOGIN: Sending response...");
+  res
     .status(statusCode.Ok200)
     .cookie("accessToken", accessToken, {
       ...baseCookieOptions,
@@ -243,15 +258,42 @@ const loginUser = asyncHandler(async (req, res) => {
     })
     .cookie("rememberMe", rememberMe ? "true" : "false", {
       ...baseCookieOptions,
+      httpOnly: false, // Allow client to read this preference
       maxAge: refreshWindowMs,
-    })
-    .json({
+    });
+
+    // --- Hardening: Manage Stealth Cookies ---
+    // 1. Clear any old session
+    // 1. Clear any old session
+    res.cookie("stealthSession", "", { ...baseCookieOptions, maxAge: 0, expires: new Date(0), httpOnly: false });
+    // Also clear without SameSite just in case
+    res.cookie("stealthSession", "", { ...baseCookieOptions, sameSite: undefined, maxAge: 0, expires: new Date(0), httpOnly: false });
+
+    // 2. Set Stealth Cookies from User object
+    if (user.stealthMode !== undefined) { // Check if field exists
+         res.cookie("stealthMode", user.stealthMode ? "true" : "false", {
+            ...baseCookieOptions,
+            httpOnly: false,
+            maxAge: LONG_REFRESH_MS, // Persist config
+         });
+         res.cookie("stealthType", user.stealthType || "calculator", {
+            ...baseCookieOptions,
+            httpOnly: false,
+            maxAge: LONG_REFRESH_MS,
+         });
+    }
+
+    return res.json({
       message: "User logged in successfully",
       user: {
         email: user.email,
         phoneNumber: user.phoneNumber,
         firstName: user.firstName,
         lastName: user.lastName,
+        stealthMode: user.stealthMode,
+        stealthType: user.stealthType,
+        dashboardPass: user.dashboardPass,
+        sosPass: user.sosPass,
       },
       expiresIn: ACCESS_EXP_MS / 1000,
     });
@@ -260,6 +302,7 @@ const loginUser = asyncHandler(async (req, res) => {
 const logoutUser = asyncHandler(async (req, res) => {
   const accessToken = req.cookies?.accessToken;
   const refreshToken = req.cookies?.refreshToken;
+  
   if (accessToken) {
     await prisma.blackListToken.create({
       data: {
@@ -276,23 +319,37 @@ const logoutUser = asyncHandler(async (req, res) => {
     });
   }
 
-  res.clearCookie("accessToken", baseCookieOptions);
-  res.clearCookie("refreshToken", baseCookieOptions);
-  res.clearCookie("rememberMe", baseCookieOptions);
-  // Clear frontend-facing stealth cookies as well
-  res.clearCookie("stealthMode", {
+  // Manually overwrite cookies to ensure they are cleared
+  const clearOptions = {
     ...baseCookieOptions,
-    httpOnly: false,
-  });
-  res.clearCookie("stealthType", {
-    ...baseCookieOptions,
-    httpOnly: false,
-  });
+    maxAge: 0,
+    expires: new Date(0),
+  };
+  
+  res.cookie("accessToken", "", clearOptions);
+  res.cookie("refreshToken", "", clearOptions);
+  res.cookie("rememberMe", "", clearOptions);
+
+  // Clear Strict variants too
+  const strictOptions = { ...clearOptions, sameSite: "Strict" };
+  res.cookie("accessToken", "", strictOptions);
+  res.cookie("refreshToken", "", strictOptions);
+  res.cookie("rememberMe", "", strictOptions);
+
+  // Clear frontend-facing stealth cookies
+  res.cookie("stealthMode", "", { ...clearOptions, httpOnly: false });
+  res.cookie("stealthType", "", { ...clearOptions, httpOnly: false });
+  res.cookie("stealthSession", "", { ...clearOptions, httpOnly: false }); // Add this line
+  res.cookie("stealthMode", "", { ...strictOptions, httpOnly: false });
+  res.cookie("stealthType", "", { ...strictOptions, httpOnly: false });
+  res.cookie("stealthSession", "", { ...strictOptions, httpOnly: false }); // Add this line
+
   console.log("logged out successfully");
   return res.status(statusCode.Ok200).json({
     message: "user logged out successfully",
   });
 });
+
 
 const onboardUser = asyncHandler(async (req, res) => {
   // console.log("data", req.validateData)
@@ -351,7 +408,20 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
       .status(statusCode.Unauthorized401)
       .json({ message: "token not found" });
 
-  const existing = await prisma.refreshToken.findUnique({ where: { token } });
+  let existing;
+  try {
+    existing = await prisma.refreshToken.findUnique({ where: { token } });
+  } catch (e) {
+    if (
+      e?.code === "P2010" ||
+      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+    ) {
+      return res
+        .status(statusCode.ServiceUnavailable503)
+        .json({ message: "Database unreachable. Please try again shortly." });
+    }
+    throw e;
+  }
   if (!existing || existing.revoked)
     return res
       .status(statusCode.Forbidden403)
@@ -359,9 +429,22 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-    });
+    let user;
+    try {
+      user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+      });
+    } catch (e) {
+      if (
+        e?.code === "P2010" ||
+        /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+      ) {
+        return res
+          .status(statusCode.ServiceUnavailable503)
+          .json({ message: "Database unreachable. Please try again shortly." });
+      }
+      throw e;
+    }
     if (!user)
       return res
         .status(statusCode.NotFound404)
@@ -384,26 +467,50 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
     }
 
     // Revoke old token
-    await prisma.refreshToken.update({
-      where: { token },
-      data: { revoked: true, revokedAt: new Date() },
-    });
+    try {
+      await prisma.refreshToken.update({
+        where: { token },
+        data: { revoked: true, revokedAt: new Date() },
+      });
+    } catch (e) {
+      if (
+        e?.code === "P2010" ||
+        /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+      ) {
+        return res
+          .status(statusCode.ServiceUnavailable503)
+          .json({ message: "Database unreachable. Please try again shortly." });
+      }
+      throw e;
+    }
 
     const accessToken = signAccess(user);
     const newRefreshToken = signRefresh(user, newExpiresAt.getTime() - now);
-    await prisma.refreshToken.create({
-      data: {
-        token: newRefreshToken,
-        userId: user.id,
-        createdAt: new Date(),
-        expiresAt: newExpiresAt,
-        initialIssuedAt: existing.initialIssuedAt,
-        rotatedFrom: existing.id,
-        rememberMe: existing.rememberMe,
-        userAgent: req.headers["user-agent"] || undefined,
-        ip: req.ip || req.connection?.remoteAddress || undefined,
-      },
-    });
+    try {
+      await prisma.refreshToken.create({
+        data: {
+          token: newRefreshToken,
+          userId: user.id,
+          createdAt: new Date(),
+          expiresAt: newExpiresAt,
+          initialIssuedAt: existing.initialIssuedAt,
+          rotatedFrom: existing.id,
+          rememberMe: existing.rememberMe,
+          userAgent: req.headers["user-agent"] || undefined,
+          ip: req.ip || req.connection?.remoteAddress || undefined,
+        },
+      });
+    } catch (e) {
+      if (
+        e?.code === "P2010" ||
+        /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
+      ) {
+        return res
+          .status(statusCode.ServiceUnavailable503)
+          .json({ message: "Database unreachable. Please try again shortly." });
+      }
+      throw e;
+    }
 
     res
       .cookie("accessToken", accessToken, {
@@ -416,6 +523,7 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
       })
       .cookie("rememberMe", existing.rememberMe ? "true" : "false", {
         ...baseCookieOptions,
+        httpOnly: false,
         maxAge: newExpiresAt.getTime() - now,
       });
 
