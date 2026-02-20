@@ -7,7 +7,7 @@ export default function chatBotSocket(io) {
     socket.on("userMessage", async (msg) => {
       try {
         const reply = await getBotReply(msg);
-        // console.log("bot reply", reply)
+        console.log("Server emitting botReply:", reply);
         socket.emit("botReply", reply);
       } catch (error) {
         console.error("Bot Reply Error:", error);

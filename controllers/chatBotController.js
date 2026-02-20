@@ -31,9 +31,9 @@ const envModel = process.env.COHERE_MODEL && process.env.COHERE_MODEL.trim();
 const MODEL_CANDIDATES = [
   ...(envModel ? [envModel] : []),
   // Current general chat / reasoning capable models (example names; adjust to actual Cohere catalog)
-  "command-r-plus-08-2024",
+  "command-r", // Faster, balanced model
+  "command-r-plus-08-2024", // Larger, slower
   "command-r-08-2025",
-  "command-r",
   "command",
 ];
 
