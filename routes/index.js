@@ -6,6 +6,8 @@ import chatBotSocket from "./chatbotRoutes.js";
 import timerRoute from "./timerRoute.js"
 import userRoute from "./userRoutes.js"
 import watchRoute from "./watchRoute.js"
+import notificationRoutes from "./notificationRoutes.js"
+import locationRoute from "./locationRoute.js"
 
 const router = express.Router();
 
@@ -15,10 +17,11 @@ router.use("/", addressRoute)
 router.use("/", userRoute)
 router.use("/", timerRoute)
 router.use("/", watchRoute)
+router.use("/", notificationRoutes)
+router.use("/", locationRoute)
 // router.use("/", chatBotSocket)
-
-export {
+export{
     authRoute, addressRoute, contactRoute,
-    timerRoute,
+    timerRoute, locationRoute,
     userRoute, watchRoute
 }

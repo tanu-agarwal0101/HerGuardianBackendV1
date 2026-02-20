@@ -4,8 +4,13 @@ import { statusCode } from "../utils/statusCode.js";
 import { checkUserId } from "../utils/validators.js";
 
 const startSafetyTimer = asyncHandler(async (req, res) => {
-  // console.log("timer", req.user)
-  const userId = req.user?.userId;
+  console.log("startSafetyTimer: req.user", req.user);
+  console.log("startSafetyTimer: req.body", req.body);
+  const userId = req.user?.userId || req.user?.id;
+  if (!userId) {
+     console.error("startSafetyTimer: No userId found in req.user");
+     return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized: No user ID" });
+  }
   const { duration, shareLocation, latitude, longitude } = req.body;
   const expiresAt = new Date(Date.now() + duration * 60 * 1000); //min to ms
 
@@ -46,6 +51,21 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
     },
   });
 
+  // Log location snapshot when timer starts
+  if (latitude && longitude) {
+    await prisma.locationLog.create({
+      data: {
+        userId,
+        timerId: timer.id,
+        latitude,
+        longitude,
+        event: "started",
+      },
+    }).catch(() => {
+      // Ignore location log errors; timer creation is more important
+    });
+  }
+
   return res.status(statusCode.Created201).json({
     success: true,
     timer,
@@ -70,7 +90,7 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
 // });
 
 const cancelSafetyTimer = asyncHandler(async (req, res) => {
-  const userId = req.user?.userId;
+  const userId = req.user?.userId || req.user?.id;
   const { status } = req.body;
   const updatedTimer = await prisma.safetyTimer.updateMany({
     where: {
@@ -94,7 +114,49 @@ const cancelSafetyTimer = asyncHandler(async (req, res) => {
   });
 });
 
-export { startSafetyTimer, cancelSafetyTimer };
+const getTimerDetails = asyncHandler(async (req, res) => {
+  const userId = req.user?.userId || req.user?.id;
+  const { timerId } = req.params || {};
+
+  if (!timerId) {
+    return res
+      .status(statusCode.BadRequest400)
+      .json({ message: "timerId is required" });
+  }
+
+  const timer = await prisma.safetyTimer.findFirst({
+    where: {
+      id: timerId,
+      userId,
+    },
+  });
+
+  if (!timer) {
+    return res
+      .status(statusCode.NotFound404)
+      .json({ message: "Timer not found" });
+  }
+
+  const [locationLogs, sosLogs] = await Promise.all([
+    prisma.locationLog.findMany({
+      where: { timerId: timer.id, userId },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    }),
+    prisma.sOSAlert.findMany({
+      where: { timerId: timer.id, userId },
+      orderBy: { triggeredAt: "desc" },
+    }),
+  ]);
+
+  return res.status(statusCode.Ok200).json({
+    timer,
+    locationLogs,
+    sosLogs,
+  });
+});
+
+export { startSafetyTimer, cancelSafetyTimer, getTimerDetails };
 
 // 5. Optional Enhancements
 // Live Location sharing during timer (using WebSocket or polling).

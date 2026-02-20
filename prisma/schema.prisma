@@ -20,6 +20,8 @@ model User {
   verificationTokens VerificationToken[]
   safetyTimers       SafetyTimer[]
   sosAlerts          SOSAlert[]
+  pushSubscriptions  PushSubscription[]
+  locationLogs       LocationLog[]
   stealthMode        Boolean             @default(false)
   stealthType        String?
   dashboardPass      String?
@@ -111,6 +113,9 @@ model SafetyTimer {
   longitude      Float?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+
+  locationLogs   LocationLog[]
+  sosAlerts      SOSAlert[]
 }
 
 model SOSAlert {
@@ -119,10 +124,42 @@ model SOSAlert {
   userId String @db.ObjectId
   user   User   @relation(fields: [userId], references: [id])
 
+  timerId String? @db.ObjectId
+  timer   SafetyTimer? @relation(fields: [timerId], references: [id])
+
   latitude    Float
   longitude   Float
   triggeredAt DateTime @default(now())
   resolved    Boolean  @default(false)
+
+  @@index([userId])
+  @@index([timerId])
+}
+
+model LocationLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  timerId   String?  @db.ObjectId
+  timer     SafetyTimer? @relation(fields: [timerId], references: [id])
+  latitude  Float
+  longitude Float
+  event     String   @default("snapshot") // started | expired | cancelled | snapshot
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([timerId])
+  @@index([createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
 
   @@index([userId])
 }

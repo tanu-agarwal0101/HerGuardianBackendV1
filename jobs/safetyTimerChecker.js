@@ -20,11 +20,24 @@ async function isDbHealthy() {
   }
 }
 
+let isJobRunning = false;
+
 Cron.schedule("* * * * *", async () => {
+  if (isJobRunning) {
+    console.warn("Previous cron job still running; skipping new cycle.");
+    return;
+  }
+  isJobRunning = true;
+
   const now = new Date();
   try {
     const healthy = await isDbHealthy();
-    if (!healthy) return; // skip this cycle quietly
+    if (!healthy) {
+       isJobRunning = false;
+       return; 
+    }
+    
+    // Find expired timers
     const expiredTimers = await prisma.safetyTimer.findMany({
       where: {
         isActive: true,
@@ -39,52 +52,79 @@ Cron.schedule("* * * * *", async () => {
       },
     });
 
-    for (const timer of expiredTimers) {
-      // Step 1: Mark timer as escalated
-      await prisma.safetyTimer.update({
-        where: { id: timer.id },
-        data: {
-          isActive: false,
-          status: "escalated",
-        },
-      });
-
-      const user = timer.user;
-      const contacts = user.emergencyContacts;
-
-      // Step 2: Trigger SOS Alert
-      const sos = await prisma.sOSAlert.create({
-        data: {
-          userId: user.id,
-          latitude: timer.latitude || 0,
-          longitude: timer.longitude || 0,
-          triggeredAt: new Date(),
-          resolved: false,
-        },
-      });
-
-      // Step 3: Notify Contacts (send real emails)
-      for (const contact of contacts) {
-        if (contact.email) {
-          try {
-            console.log(`Sending SOS email to ${contact.email}...`);
-            await sendSOSMail({
-              to: contact.email,
-              userName: user.firstName || user.email || "User",
-              locationUrl: `https://maps.google.com/?q=${timer.latitude || 0},${timer.longitude || 0}`,
-              triggeredAt: timer.expiresAt.toLocaleString(),
-            });
-            console.log(`SOS email sent to ${contact.email}`);
-          } catch (e) {
-            console.error(`Failed to send SOS email to ${contact.email}:`, e);
-          }
-        }
-      }
-      console.log(
-        `All SOS emails sent for user ${user.email || user.id} (timer ${timer.id})`
-      );
+    if (expiredTimers.length > 0) {
+        console.log(`Processing ${expiredTimers.length} expired timers...`);
     }
+
+    // Process timers concurrently (limit concurrency if needed, but safe here)
+    await Promise.all(expiredTimers.map(async (timer) => {
+        try {
+            // Step 1: Mark timer as escalated (atomic update)
+            await prisma.safetyTimer.update({
+                where: { id: timer.id },
+                data: {
+                isActive: false,
+                status: "escalated",
+                },
+            });
+
+            // Log location snapshot when timer expires (fire and forget)
+            if (timer.latitude && timer.longitude) {
+                prisma.locationLog.create({
+                data: {
+                    userId: timer.userId,
+                    timerId: timer.id,
+                    latitude: timer.latitude,
+                    longitude: timer.longitude,
+                    event: "expired",
+                },
+                }).catch(() => {}); // silent fail safe
+            }
+
+            const user = timer.user;
+            const contacts = user.emergencyContacts;
+
+            // Step 2: Trigger SOS Alert
+            await prisma.sOSAlert.create({
+                data: {
+                userId: user.id,
+                timerId: timer.id,
+                latitude: timer.latitude || 0,
+                longitude: timer.longitude || 0,
+                triggeredAt: new Date(),
+                resolved: false,
+                },
+            });
+
+            // Step 3: Notify Contacts concurrently
+            await Promise.all(contacts.map(async (contact) => {
+                if (contact.email) {
+                    try {
+                        console.log(`Sending SOS email to ${contact.email}...`);
+                        await sendSOSMail({
+                        to: contact.email,
+                        userName: user.firstName || user.email || "User",
+                        locationUrl: `https://maps.google.com/?q=${timer.latitude || 0},${timer.longitude || 0}`,
+                        triggeredAt: timer.expiresAt.toLocaleString(),
+                        });
+                        console.log(`SOS email sent to ${contact.email}`);
+                    } catch (e) {
+                        console.error(`Failed to send SOS email to ${contact.email}:`, e);
+                    }
+                }
+            }));
+
+            console.log(
+                `All SOS emails sent for user ${user.email || user.id} (timer ${timer.id})`
+            );
+        } catch (timerError) {
+            console.error(`Error processing timer ${timer.id}:`, timerError);
+        }
+    }));
+
   } catch (e) {
     console.error("Cron Job error", e);
+  } finally {
+    isJobRunning = false;
   }
 });

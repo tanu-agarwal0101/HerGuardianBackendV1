@@ -10,9 +10,8 @@ const updateStealth = asyncHandler(async (req, res) => {
   const {
     stealthMode,
     stealthType,
-    stealthPin,
-    stealthKeyword,
-    stealthGesture,
+    dashboardPass,
+    sosPass,
   } = req.body;
 
   const isUserValid = await checkUserId(userId);
@@ -22,46 +21,48 @@ const updateStealth = asyncHandler(async (req, res) => {
     });
   }
 
+  // Check if stealthMode is provided before using it or setting cookies
+  // If not provided, we might still want to update other fields, but we can't set the cookie to "undefined"
+  
+  const dataToUpdate = {};
+  if (stealthMode !== undefined) dataToUpdate.stealthMode = stealthMode;
+  if (stealthType !== undefined) dataToUpdate.stealthType = stealthType;
+  if (dashboardPass !== undefined) dataToUpdate.dashboardPass = dashboardPass;
+  if (sosPass !== undefined) dataToUpdate.sosPass = sosPass;
+
   await prisma.user.update({
     where: { id: userId },
-    data: {
-      stealthMode,
-      stealthType,
-      stealthPin,
-      stealthKeyword,
-      stealthGesture,
-    },
+    data: dataToUpdate,
   });
 
-  res.clearCookie("stealthMode", {
+  // Base options matching authController
+  const cookieOptions = {
     path: "/",
-    sameSite: "Strict",
+    sameSite: "Lax", // Match authController to avoid port issues
     secure: process.env.NODE_ENV === "production",
-  });
-  res.clearCookie("stealthType", {
-    path: "/",
-    sameSite: "Strict",
-    secure: process.env.NODE_ENV === "production",
-  });
+  };
 
-  res.cookie("stealthMode", stealthMode.toString(), {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-  });
+  // Only update cookies if the values were provided/changed
+  if (stealthMode !== undefined) {
+      res.clearCookie("stealthMode", cookieOptions);
+      res.cookie("stealthMode", stealthMode ? "true" : "false", {
+        ...cookieOptions,
+        httpOnly: false,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+  }
 
-  res.cookie("stealthType", stealthType || "calculator", {
-    httpOnly: false,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "Strict",
-    path: "/",
-    maxAge: 30 * 24 * 60 * 60 * 1000,
-  });
+  if (stealthType !== undefined) {
+      res.clearCookie("stealthType", cookieOptions);
+      res.cookie("stealthType", stealthType || "calculator", {
+        ...cookieOptions,
+        httpOnly: false,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      });
+  }
 
   return res.status(statusCode.Ok200).json({
-    message: "Stealth settings updated and cookies set",
+    message: "Stealth settings updated",
   });
 });
 
@@ -72,9 +73,8 @@ const getStealth = asyncHandler(async (req, res) => {
     select: {
       stealthMode: true,
       stealthType: true,
-      stealthPin: true,
-      stealthKeyword: true,
-      stealthGesture: true,
+      dashboardPass: true,
+      sosPass: true,
     },
   });
   if (!user)
@@ -148,6 +148,8 @@ const getProfile = asyncHandler(async (req, res) => {
     phoneNumber: user.phoneNumber,
     stealthMode: user.stealthMode,
     stealthType: user.stealthType,
+    dashboardPass: user.dashboardPass,
+    sosPass: user.sosPass,
     safetyTimer: user.safetyTimer,
     addresses: user.address,
     contacts: user.emergencyContacts,
@@ -242,11 +244,11 @@ const getAllUsers = asyncHandler(async (req, res) => {
 
 const sosTrigger = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
-  const { latitude, longitude, triggeredAt } = req.body;
+  const { latitude, longitude, triggeredAt, timerId } = req.body || {};
 
   const sos = await triggerSOS(
     userId,
-    { lat: latitude, lon: longitude },
+    { lat: latitude, lon: longitude, timerId },
     triggeredAt
   );
 

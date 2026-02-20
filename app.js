@@ -11,6 +11,7 @@ import {
   timerRoute,
   userRoute,
   watchRoute,
+  locationRoute,
 } from "./routes/index.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 
@@ -68,6 +69,7 @@ app.use("/address", addressRoute);
 app.use("/timer", timerRoute);
 app.use("/users", userRoute);
 app.use("/watch", watchRoute);
+app.use("/", locationRoute);
 // Global error handler
 
 app.use(errorHandler);

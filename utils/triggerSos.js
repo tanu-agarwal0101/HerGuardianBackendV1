@@ -4,7 +4,7 @@ import { sendSOSMail } from "../utils/emailService.js";
 import { statusCode } from "../utils/statusCode.js";
 import { checkUserId } from "../utils/validators.js";
 
-export async function triggerSOS(userId, { lat, lon }, triggeredAt) {
+export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
 //   if (!(await checkUserId(userId))) {
 //     throw { status: statusCode.Unauthorized401, message: "invalid user id" };
 //   }
@@ -21,6 +21,7 @@ export async function triggerSOS(userId, { lat, lon }, triggeredAt) {
       latitude: parseFloat(lat),
       longitude: parseFloat(lon),
       triggeredAt: time,
+      ...(timerId ? { timerId } : {}),
     },
   });
 
