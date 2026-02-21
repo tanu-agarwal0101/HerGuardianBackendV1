@@ -9,7 +9,7 @@ export const getVapidPublic = asyncHandler(async (req, res) => {
 });
 
 export const subscribe = asyncHandler(async (req, res) => {
-  const userId = req.user?.id;
+  const userId = req.user?.userId;
   if (!userId) return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized" });
   const sub = req.body;
   const endpoint = sub?.endpoint;
@@ -17,7 +17,6 @@ export const subscribe = asyncHandler(async (req, res) => {
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
     return res.status(statusCode.BadRequest400).json({ message: "Invalid subscription" });
   }
-  // Upsert by endpoint
   await prisma.pushSubscription.upsert({
     where: { endpoint },
     update: { userId, p256dh: keys.p256dh, auth: keys.auth },
@@ -27,7 +26,7 @@ export const subscribe = asyncHandler(async (req, res) => {
 });
 
 export const sendTest = asyncHandler(async (req, res) => {
-  const userId = req.user?.id;
+  const userId = req.user?.userId;
   if (!userId) return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized" });
   ensureVapidKeys();
   const subs = await prisma.pushSubscription.findMany({ where: { userId } });
@@ -37,12 +36,9 @@ export const sendTest = asyncHandler(async (req, res) => {
     try {
       await sendPush({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
       sent++;
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error("Push failed", e?.message);
+    } catch (_e) {
+      // Push delivery failure — non-critical, continue with remaining subscriptions
     }
   }
   return res.status(statusCode.Ok200).json({ sent });
 });
-
-

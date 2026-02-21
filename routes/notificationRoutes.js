@@ -1,13 +1,11 @@
 import express from "express";
 import { getVapidPublic, subscribe, sendTest } from "../controllers/notificationController.js";
-import  verifyAccessToken  from "../middleware/verifyAccessTokenMiddleware.js";
+import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.get("/api/notifications/vapid-public", getVapidPublic);
-router.post("/api/notifications/subscribe", verifyAccessToken, subscribe);
-router.post("/api/notifications/send", verifyAccessToken, sendTest);
+router.get("/vapid-public", getVapidPublic);
+router.post("/subscribe", authMiddleware, subscribe);
+router.post("/send", authMiddleware, sendTest);
 
 export default router;
-
-

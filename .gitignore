@@ -44,3 +44,12 @@ build/
 
 ## Public uploads (uncomment if you store runtime uploads here)
 # public/uploads/
+
+# Azure deployment/config
+.azure/
+
+# Editor history
+.history/
+
+# Local overrides
+*.local

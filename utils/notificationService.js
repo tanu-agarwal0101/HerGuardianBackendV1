@@ -8,8 +8,6 @@ export function ensureVapidKeys() {
     const keys = webpush.generateVAPIDKeys();
     vapidPublic = keys.publicKey;
     vapidPrivate = keys.privateKey;
-    // eslint-disable-next-line no-console
-    console.log("Generated ephemeral VAPID keys. Set VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY for production.");
   }
   webpush.setVapidDetails(
     process.env.VAPID_SUBJECT || "mailto:admin@example.com",

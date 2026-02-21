@@ -4,22 +4,12 @@ import { statusCode } from "../utils/statusCode.js";
 import { checkUserId } from "../utils/validators.js";
 
 const startSafetyTimer = asyncHandler(async (req, res) => {
-  console.log("startSafetyTimer: req.user", req.user);
-  console.log("startSafetyTimer: req.body", req.body);
   const userId = req.user?.userId || req.user?.id;
   if (!userId) {
-     console.error("startSafetyTimer: No userId found in req.user");
-     return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized: No user ID" });
+    return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized: No user ID" });
   }
   const { duration, shareLocation, latitude, longitude } = req.body;
-  const expiresAt = new Date(Date.now() + duration * 60 * 1000); //min to ms
-
-  // const isUserIdValid = await checkUserId(userId);
-  //     if(!isUserIdValid){
-  //         return res.status(statusCode.NotFound404).json({
-  //             message: "User not found"
-  //         })
-  //     }
+  const expiresAt = new Date(Date.now() + duration * 60 * 1000);
 
   if (!(await checkUserId(userId))) {
     return res
@@ -29,14 +19,8 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
 
   // Deactivate any existing active timers for this user
   await prisma.safetyTimer.updateMany({
-    where: {
-      userId,
-      isActive: true,
-    },
-    data: {
-      isActive: false,
-      status: "cancelled",
-    },
+    where: { userId, isActive: true },
+    data: { isActive: false, status: "cancelled" },
   });
 
   const timer = await prisma.safetyTimer.create({
@@ -72,35 +56,12 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
   });
 });
 
-// const getActiveSafetyTimer = asyncHandler(async (req, res) => {
-//   const userId = req.user?.userId;
-
-//   const activeTimer = await prisma.safetyTimer.findFirst({
-//     where: {
-//       userId,
-//       isActive: true,
-//     },
-//   });
-
-//   if (!activeTimer) {
-//     return res.status(statusCode.NotFound404).json({ message: "No active timer found" });
-//   }
-
-//   return res.status(statusCode.Ok200).json({ timer: activeTimer });
-// });
-
 const cancelSafetyTimer = asyncHandler(async (req, res) => {
   const userId = req.user?.userId || req.user?.id;
   const { status } = req.body;
   const updatedTimer = await prisma.safetyTimer.updateMany({
-    where: {
-      userId,
-      isActive: true,
-    },
-    data: {
-      isActive: false,
-      status,
-    },
+    where: { userId, isActive: true },
+    data: { isActive: false, status },
   });
 
   if (updatedTimer.count == 0) {
@@ -125,10 +86,7 @@ const getTimerDetails = asyncHandler(async (req, res) => {
   }
 
   const timer = await prisma.safetyTimer.findFirst({
-    where: {
-      id: timerId,
-      userId,
-    },
+    where: { id: timerId, userId },
   });
 
   if (!timer) {
@@ -157,15 +115,3 @@ const getTimerDetails = asyncHandler(async (req, res) => {
 });
 
 export { startSafetyTimer, cancelSafetyTimer, getTimerDetails };
-
-// 5. Optional Enhancements
-// Live Location sharing during timer (using WebSocket or polling).
-
-// Notifications to user before timer expires: “Your timer is about to expire in 5 minutes”.
-
-// Extend timer option.
-
-// Panic button on the timer screen.
-
-// DB Cleanup (Optional)
-// You may add a cron job to delete or archive expired/inactive timers after 7 days.

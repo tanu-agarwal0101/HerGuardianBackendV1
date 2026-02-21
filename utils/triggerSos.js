@@ -1,14 +1,10 @@
-// services/sosService.js
 import prisma from "../utils/prisma.js";
 import { sendSOSMail } from "../utils/emailService.js";
 import { statusCode } from "../utils/statusCode.js";
 import { checkUserId } from "../utils/validators.js";
+import { notifyUser } from "../utils/pushToUser.js";
 
 export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
-//   if (!(await checkUserId(userId))) {
-//     throw { status: statusCode.Unauthorized401, message: "invalid user id" };
-//   }
-
   if (!lat || !lon) {
     throw { status: statusCode.BadRequest400, message: "Location is required" };
   }
@@ -52,11 +48,17 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
     });
   }
 
+  // Push notification to user's devices (fire-and-forget)
+  notifyUser(userId, {
+    title: "🚨 SOS Alert Triggered",
+    body: "Your emergency contacts have been notified.",
+    url: `https://www.google.com/maps?q=${lat},${lon}`,
+  }).catch(() => {});
+
   // mark resolved if needed
   await prisma.sOSAlert.update({
     where: { id: sos.id },
     data: { resolved: true },
   });
-console.log("sos sent")
   return sos;
 }

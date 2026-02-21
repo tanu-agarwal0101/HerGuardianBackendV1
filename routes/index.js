@@ -23,5 +23,5 @@ router.use("/", locationRoute)
 export{
     authRoute, addressRoute, contactRoute,
     timerRoute, locationRoute,
-    userRoute, watchRoute
+    userRoute, watchRoute, notificationRoutes
 }

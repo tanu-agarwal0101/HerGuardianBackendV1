@@ -12,12 +12,16 @@ import {
   userRoute,
   watchRoute,
   locationRoute,
+  notificationRoutes,
 } from "./routes/index.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
+import { globalRateLimiter } from "./utils/rateLimiter.js";
 
 const app = express();
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+
+app.use(globalRateLimiter);
 
 const isDev = process.env.NODE_ENV !== "production";
 const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "")
@@ -47,20 +51,20 @@ if (process.env.NODE_ENV !== "production") {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use((req, res, next) => {
-  console.log("Request body: ", req.body);
-  next();
-});
-
 app.get("/", (req, res) => {
   res.send("<h1>Welcome to HerGuardian</h1>");
 });
 
-app.get("/health", (req, res) => {
-  res.status(200).json({ status: "ok" });
+app.get("/health", async (req, res) => {
+  try {
+    const { default: prisma } = await import("./utils/prisma.js");
+    await prisma.$runCommandRaw({ ping: 1 });
+    res.status(200).json({ status: "ok", db: "connected" });
+  } catch (_e) {
+    res.status(503).json({ status: "degraded", db: "disconnected" });
+  }
 });
 
-app.use(express.static("public"));
 app.use(cookieParser());
 
 app.use("/users", authRoute);
@@ -69,6 +73,7 @@ app.use("/address", addressRoute);
 app.use("/timer", timerRoute);
 app.use("/users", userRoute);
 app.use("/watch", watchRoute);
+app.use("/api/notifications", notificationRoutes);
 app.use("/", locationRoute);
 // Global error handler
 
