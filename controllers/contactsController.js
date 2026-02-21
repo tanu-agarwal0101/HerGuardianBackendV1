@@ -1,28 +1,26 @@
 import prisma from '../utils/prisma.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { statusCode } from '../utils/statusCode.js'
+import { statusCode } from '../utils/statusCode.js';
 import { checkUserId } from '../utils/validators.js';
 
-const createEmergencyContact = asyncHandler(async(req, res)=>{
-    // console.log("user", req.user)
+const createEmergencyContact = asyncHandler(async (req, res) => {
     const userId = req.user.userId;
-    const {emergencyContacts} = req.body;
-    if(!Array.isArray(emergencyContacts) || emergencyContacts.length === 0 || !userId){
+    const { emergencyContacts } = req.body;
+    if (!Array.isArray(emergencyContacts) || emergencyContacts.length === 0 || !userId) {
         return res.status(statusCode.BadRequest400).json({
             message: "add emergency contacts"
-        })
+        });
     }
     const isUserIdValid = await checkUserId(userId);
-    if(!isUserIdValid){
+    if (!isUserIdValid) {
         return res.status(statusCode.NotFound404).json({
             message: "User not found"
-        })
+        });
     }
 
     const seenPhoneNumbers = new Set();
     const duplicateContacts = emergencyContacts.filter((contact) => {
-        if (seenPhoneNumbers.has(contact.phoneNumber))   return true;
-        
+        if (seenPhoneNumbers.has(contact.phoneNumber)) return true;
         seenPhoneNumbers.add(contact.phoneNumber);
         return false;
     });
@@ -33,7 +31,7 @@ const createEmergencyContact = asyncHandler(async(req, res)=>{
             duplicates: duplicateContacts
         });
     }
-    
+
     const existingDBContacts = await prisma.emergencyContact.findMany({
         where: {
             userId,
@@ -58,62 +56,47 @@ const createEmergencyContact = asyncHandler(async(req, res)=>{
         message: "Emergency contacts created successfully",
         count: createdContacts.count,
     });
+});
 
-})
-
-const addSingleEmergencyContact = asyncHandler(async(req, res)=>{
+const addSingleEmergencyContact = asyncHandler(async (req, res) => {
     const userId = req.user?.userId;
-    const {name, phoneNumber, email, relationship} = req.body;
+    const { name, phoneNumber, email, relationship } = req.body;
 
-    if(!name || !phoneNumber){
+    if (!name || !phoneNumber) {
         return res.status(statusCode.BadRequest400).json({
             message: "Name and phone number are required"
-        })
+        });
     }
 
     const existingContact = await prisma.emergencyContact.findFirst({
-        where: {
-            userId, phoneNumber,
-        }
-    })
+        where: { userId, phoneNumber }
+    });
 
-    if(existingContact){
+    if (existingContact) {
         return res.status(statusCode.BadRequest400).json({
             message: "This phone number already exists in your list"
-        })
+        });
     }
 
     const createdContact = await prisma.emergencyContact.create({
         data: {
-            userId, 
-            name, 
-            phoneNumber, 
+            userId,
+            name,
+            phoneNumber,
             email: email ?? null,
             relationship: relationship ?? null,
         }
-    })
+    });
 
     return res.status(statusCode.Created201).json({
         message: "Emergency contact created successfully",
         contact: createdContact
-    })
-})
-
+    });
+});
 
 const updateEmergencyContact = asyncHandler(async (req, res) => {
-    // const { userId } = req.user.userId;
-    const {contactId, name, phoneNumber, email, relationship } = req.body;
-
-    // const existingContact = await prisma.emergencyContact.findUnique({
-    //     where: {phoneNumber: phoneNumber},
-    // });
-
-    // const updateData = {};
-
-    // if (name !== undefined) updateData.name = name;
-    // if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
-    // if (email !== undefined) updateData.email = email;
-    // if (relationship !== undefined) updateData.relationship = relationship;
+    const userId = req.user.userId;
+    const { contactId, name, phoneNumber, email, relationship } = req.body;
 
     const existingContact = await prisma.emergencyContact.findUnique({
         where: { id: contactId },
@@ -124,6 +107,14 @@ const updateEmergencyContact = asyncHandler(async (req, res) => {
             message: "Contact not found",
         });
     }
+
+    // Ownership check: verify contact belongs to authenticated user
+    if (existingContact.userId !== userId) {
+        return res.status(statusCode.Forbidden403).json({
+            message: "You do not own this contact",
+        });
+    }
+
     const updatedContact = await prisma.emergencyContact.update({
         where: { id: existingContact.id },
         data: {
@@ -137,10 +128,11 @@ const updateEmergencyContact = asyncHandler(async (req, res) => {
         message: "Contact updated successfully",
         contact: updatedContact,
     });
-})
+});
 
 const deleteContact = asyncHandler(async (req, res) => {
-    const {contactId} = req.body;
+    const userId = req.user.userId;
+    const { contactId } = req.body;
     if (!contactId) {
         return res.status(statusCode.BadRequest400).json({
             message: "Contact ID is required",
@@ -154,19 +146,27 @@ const deleteContact = asyncHandler(async (req, res) => {
             message: "Contact not found",
         });
     }
+
+    // Ownership check: verify contact belongs to authenticated user
+    if (existingContact.userId !== userId) {
+        return res.status(statusCode.Forbidden403).json({
+            message: "You do not own this contact",
+        });
+    }
+
     await prisma.emergencyContact.delete({
         where: { id: existingContact.id },
     });
     return res.status(statusCode.Ok200).json({
         message: "Contact deleted successfully",
     });
-})
+});
 
 const getAllContactsByUserId = asyncHandler(async (req, res) => {
-    const userId = req.user.userId
+    const userId = req.user.userId;
     const contacts = await prisma.emergencyContact.findMany({
         where: { userId: userId },
-        orderBy: {createdAt: 'desc'}
+        orderBy: { createdAt: 'desc' }
     });
     if (!contacts) {
         return res.status(statusCode.NotFound404).json({
@@ -177,8 +177,7 @@ const getAllContactsByUserId = asyncHandler(async (req, res) => {
         message: "Contacts retrieved successfully",
         contacts: contacts,
     });
-})
-
+});
 
 export {
   createEmergencyContact,

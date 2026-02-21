@@ -34,7 +34,6 @@ export const validatePassword = (password) => {
 
 export const validateSchema = (schema) => (req, res, next) => {
   try {
-    // console.log(schema)
     const parsed = schema.parse(req.body);
     req.validateData = parsed;
     return next();
@@ -59,7 +58,6 @@ export const validateSchema = (schema) => (req, res, next) => {
         }),
       });
     }
-    console.error(error);
     return res.status(500).json({ message: "Internal Server Error" });
   }
 };

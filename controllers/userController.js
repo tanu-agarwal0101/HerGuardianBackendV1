@@ -2,17 +2,12 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import prisma from "../utils/prisma.js";
 import { statusCode } from "../utils/statusCode.js";
 import { checkUserId } from "../utils/validators.js";
-import { sendSOSMail } from "../utils/emailService.js";
 import { triggerSOS } from "../utils/triggerSos.js";
+import bcrypt from "bcrypt";
 
 const updateStealth = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
-  const {
-    stealthMode,
-    stealthType,
-    dashboardPass,
-    sosPass,
-  } = req.body;
+  const { stealthMode, stealthType, dashboardPass, sosPass } = req.body;
 
   const isUserValid = await checkUserId(userId);
   if (!isUserValid) {
@@ -21,44 +16,39 @@ const updateStealth = asyncHandler(async (req, res) => {
     });
   }
 
-  // Check if stealthMode is provided before using it or setting cookies
-  // If not provided, we might still want to update other fields, but we can't set the cookie to "undefined"
-  
   const dataToUpdate = {};
   if (stealthMode !== undefined) dataToUpdate.stealthMode = stealthMode;
   if (stealthType !== undefined) dataToUpdate.stealthType = stealthType;
-  if (dashboardPass !== undefined) dataToUpdate.dashboardPass = dashboardPass;
-  if (sosPass !== undefined) dataToUpdate.sosPass = sosPass;
+  if (dashboardPass) dataToUpdate.dashboardPass = await bcrypt.hash(dashboardPass, 10);
+  if (sosPass) dataToUpdate.sosPass = await bcrypt.hash(sosPass, 10);
 
   await prisma.user.update({
     where: { id: userId },
     data: dataToUpdate,
   });
 
-  // Base options matching authController
   const cookieOptions = {
     path: "/",
-    sameSite: "Lax", // Match authController to avoid port issues
+    sameSite: "Lax",
     secure: process.env.NODE_ENV === "production",
   };
 
-  // Only update cookies if the values were provided/changed
   if (stealthMode !== undefined) {
-      res.clearCookie("stealthMode", cookieOptions);
-      res.cookie("stealthMode", stealthMode ? "true" : "false", {
-        ...cookieOptions,
-        httpOnly: false,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+    res.clearCookie("stealthMode", cookieOptions);
+    res.cookie("stealthMode", stealthMode ? "true" : "false", {
+      ...cookieOptions,
+      httpOnly: false,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
   }
 
   if (stealthType !== undefined) {
-      res.clearCookie("stealthType", cookieOptions);
-      res.cookie("stealthType", stealthType || "calculator", {
-        ...cookieOptions,
-        httpOnly: false,
-        maxAge: 30 * 24 * 60 * 60 * 1000,
-      });
+    res.clearCookie("stealthType", cookieOptions);
+    res.cookie("stealthType", stealthType || "calculator", {
+      ...cookieOptions,
+      httpOnly: false,
+      maxAge: 30 * 24 * 60 * 60 * 1000,
+    });
   }
 
   return res.status(statusCode.Ok200).json({
@@ -73,8 +63,6 @@ const getStealth = asyncHandler(async (req, res) => {
     select: {
       stealthMode: true,
       stealthType: true,
-      dashboardPass: true,
-      sosPass: true,
     },
   });
   if (!user)
@@ -83,37 +71,6 @@ const getStealth = asyncHandler(async (req, res) => {
       .json({ message: "user not found" });
   return res.status(statusCode.Ok200).json({ stealth: user });
 });
-
-// const getProfile = asyncHandler(async (req, res) => {
-//  const userId = req.user?.userId;
-
-//   if (!userId) {
-//     return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized" });
-//   }
-
-//   const user = await prisma.user.findUnique({
-//     where: { id: userId },
-//     include: {
-//       password: false,
-//       address: true,
-//       emergencyContacts: true,
-//       safetyTimers: {
-//         orderBy: { createdAt: "desc" },
-//       },
-//       sosAlerts: {
-//         orderBy: { triggeredAt: "desc" },
-//       },
-//       refreshTokens: false,
-//       verificationTokens: false,
-//     },
-//   });
-
-//   if (!user) {
-//     return res.status(statusCode.NotFound404).json({ message: "User not found" });
-//   }
-
-//   return res.status(statusCode.Ok200).json({ user });
-// });
 
 const getProfile = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
@@ -148,99 +105,16 @@ const getProfile = asyncHandler(async (req, res) => {
     phoneNumber: user.phoneNumber,
     stealthMode: user.stealthMode,
     stealthType: user.stealthType,
-    dashboardPass: user.dashboardPass,
-    sosPass: user.sosPass,
     safetyTimer: user.safetyTimer,
     addresses: user.address,
     contacts: user.emergencyContacts,
     sosTriggers: user.sosAlerts,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
-    // profilePicture: null,
   };
 
   return res.status(statusCode.Ok200).json({ user: safeUser });
 });
-
-const getAllUsers = asyncHandler(async (req, res) => {
-  const users = await prisma.user.findMany({
-    select: {
-      email: true,
-      createdAt: true,
-    },
-  });
-
-  return res.status(statusCode.Ok200).json({ users });
-});
-
-// const sosTrigger = asyncHandler(async (req, res) => {
-//   const userId = req.user.userId;
-//   const { latitude, longitude, triggeredAt } = req.body;
-
-//   if (!(await checkUserId(userId)))
-//     return res.status(statusCode.Unauthorized401).json({
-//       message: "invalid user id",
-//     });
-
-//   if (!latitude || !longitude)
-//     return res.status(statusCode.BadRequest400).json({
-//       message: "Location is required",
-//     });
-
-//   const sos = await prisma.sOSAlert.create({
-//     data: {
-//       userId,
-//       latitude: parseFloat(latitude),
-//       longitude: parseFloat(longitude),
-//       triggeredAt: triggeredAt ? new Date(triggeredAt) : new Date(),
-//     },
-
-//   });
-
-//   const user = await prisma.user.findUnique({
-//     where: { id: userId },
-//     include: {
-//       emergencyContacts: true,
-//     },
-//   });
-
-//   if (!user || !user.emergencyContacts.length) {
-//     return res.status(statusCode.BadRequest400).json({
-//       message: "no emergency contacts found",
-//     });
-//   }
-
-//   const triggeredTime = new Date(triggeredAt).toLocaleString("en-IN", {
-//   timeZone: "Asia/Kolkata",
-//   weekday: "short",
-//   year: "numeric",
-//   month: "short",
-//   day: "numeric",
-//   hour: "2-digit",
-//   minute: "2-digit"
-// });
-
-//   const emails = user.emergencyContacts
-//     .map((contact) => contact.email)
-//     .filter(Boolean);
-
-//   const locationUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
-
-//   await sendSOSMail({
-//     to: emails,
-//     userName: `${user.firstName || "A user"}`,
-//     locationUrl,
-//     triggeredTime,
-//   });
-
-//   await prisma.sOSAlert.update({
-//     where: {id: sos.id},
-//     data: {resolved: true}
-//   })
-//   return res.status(statusCode.Created201).json({
-//     message: "sos triggered successfully",
-//   });
-// });
 
 const sosTrigger = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
@@ -252,7 +126,7 @@ const sosTrigger = asyncHandler(async (req, res) => {
     triggeredAt
   );
 
-  res.status(201).json({ message: "sos triggered successfully", sos });
+  return res.status(statusCode.Created201).json({ message: "sos triggered successfully", sos });
 });
 
 const getSOSLogs = asyncHandler(async (req, res) => {
@@ -273,17 +147,47 @@ const getSOSLogs = asyncHandler(async (req, res) => {
   return res.status(statusCode.Ok200).json({ sosLogs, message: "logs found" });
 });
 
-// resolved: true immediately
-// Right now, the alert is closed the second you create it.
-// Better → keep it resolved: false until the user marks themselves safe or an admin resolves it.
-// data: { resolved: false }
-// and only update it later in a resolveSOS endpoint.
+const verifyStealthPin = asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+  const { pin } = req.body;
+
+  if (!pin) {
+    return res.status(statusCode.BadRequest400).json({ success: false, message: "PIN is required" });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { dashboardPass: true, sosPass: true }
+  });
+
+  if (!user) {
+    return res.status(statusCode.NotFound404).json({ success: false, message: "User not found" });
+  }
+
+  // Check SOS Pin First
+  if (user.sosPass) {
+    const isSos = await bcrypt.compare(pin, user.sosPass);
+    if (isSos) {
+      return res.status(statusCode.Ok200).json({ success: true, type: "sos" });
+    }
+  }
+
+  // Check Dashboard Pin
+  if (user.dashboardPass) {
+    const isDashboard = await bcrypt.compare(pin, user.dashboardPass);
+    if (isDashboard) {
+      return res.status(statusCode.Ok200).json({ success: true, type: "dashboard" });
+    }
+  }
+
+  return res.status(statusCode.Unauthorized401).json({ success: false, message: "Invalid PIN" });
+});
 
 export {
   updateStealth,
   getProfile,
-  getAllUsers,
   sosTrigger,
   getSOSLogs,
   getStealth,
+  verifyStealthPin,
 };

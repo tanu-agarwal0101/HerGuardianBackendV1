@@ -7,15 +7,27 @@ import {
   onboardUser,
   refreshTokenHandler,
 } from "../controllers/authController.js";
+import {
+  verifyEmail,
+  forgotPassword,
+  resetPassword,
+  resendVerificationEmail,
+} from "../controllers/verificationController.js";
 import { validateSchema } from "../utils/validators.js";
-import { registerSchema, loginSchema, onboardSchema } from "../schemas/auth.js";
-import verifyAccessToken from "../middleware/verifyAccessTokenMiddleware.js";
+import { 
+  registerSchema, 
+  loginSchema, 
+  onboardSchema,
+  verifyEmailSchema,
+  forgotPasswordSchema,
+  resetPasswordSchema
+} from "../schemas/auth.js";
+import { authRateLimiter } from "../utils/rateLimiter.js";
 
 const router = Router();
-router.post("/register", validateSchema(registerSchema), registerUser);
-router.post("/login", validateSchema(loginSchema), loginUser);
+router.post("/register", authRateLimiter, validateSchema(registerSchema), registerUser);
+router.post("/login", authRateLimiter, validateSchema(loginSchema), loginUser);
 router.post("/logout", logoutUser);
-// router.route("/logout").post(logoutUser);
 router.patch(
   "/onboard",
   authMiddleware,
@@ -23,7 +35,11 @@ router.patch(
   onboardUser
 );
 
-// Allow refresh without a valid access token; rely on refreshToken cookie
 router.post("/refresh-token", refreshTokenHandler);
+
+router.post("/verify-email", authRateLimiter, validateSchema(verifyEmailSchema), verifyEmail);
+router.post("/forgot-password", authRateLimiter, validateSchema(forgotPasswordSchema), forgotPassword);
+router.post("/reset-password", authRateLimiter, validateSchema(resetPasswordSchema), resetPassword);
+router.post("/resend-verification", authRateLimiter, validateSchema(forgotPasswordSchema), resendVerificationEmail);
 
 export default router;

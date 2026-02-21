@@ -1,20 +1,11 @@
 import prisma from '../utils/prisma.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { statusCode } from '../utils/statusCode.js'
+import { statusCode } from '../utils/statusCode.js';
+import { checkUserId } from '../utils/validators.js';
 
-const checkUserId = async (userId) => {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-    });
-    if (!user) {
-      return false;
-    } else {
-      return true;
-    }
-  };
 const createAddress = asyncHandler(async (req, res) => {
     const userId = req.user.userId;
-    const { street, city, country, zipCode, state, type, latitude, longitude, radiusMeters} = req.body;
+    const { street, city, country, zipCode, state, type, latitude, longitude, radiusMeters } = req.body;
 
     if (!longitude || !latitude || !type) {
         return res.status(statusCode.BadRequest400).json({
@@ -45,33 +36,43 @@ const createAddress = asyncHandler(async (req, res) => {
         message: "Address created successfully",
         address: createdAddress,
     });
-
 });
 
 const updateAddress = asyncHandler(async (req, res) => {
-    const {addressId, street, city, country, zipCode, state, type, longitude, latitude, radiusMeters} = req.body;
+    const userId = req.user.userId;
+    const { addressId, street, city, country, zipCode, state, type, longitude, latitude, radiusMeters } = req.body;
 
-    if(!addressId){
+    if (!addressId) {
         return res.status(statusCode.BadRequest400).json({
             message: "Address Id is required"
-        })
+        });
     }
-    // const {userId} = req.user.userId;
-    if (!street && !city && !country && !zipCode && !state && !type && !latitude && !longitude && !radiusMeters ) {
+
+    if (!street && !city && !country && !zipCode && !state && !type && !latitude && !longitude && !radiusMeters) {
         return res.status(statusCode.BadRequest400).json({
             message: "At least one field is required",
         });
     }
-    // const isUserIdValid = await checkUserId(userId);
-    // if (!isUserIdValid) {
-    //     return res.status(statusCode.NotFound404).json({
-    //         message: "User not found",
-    //     });
-    // }
+
+    const existingAddress = await prisma.address.findUnique({
+        where: { id: addressId },
+    });
+
+    if (!existingAddress) {
+        return res.status(statusCode.NotFound404).json({
+            message: "Address not found",
+        });
+    }
+
+    // Ownership check
+    if (existingAddress.userId !== userId) {
+        return res.status(statusCode.Forbidden403).json({
+            message: "You do not own this address",
+        });
+    }
+
     const updatedAddress = await prisma.address.update({
-        where: {
-            id: addressId,
-        },
+        where: { id: addressId },
         data: {
             street,
             city,
@@ -88,27 +89,44 @@ const updateAddress = asyncHandler(async (req, res) => {
         message: "Address updated successfully",
         address: updatedAddress,
     });
-})
+});
 
 const deleteAddress = asyncHandler(async (req, res) => {
-    const {addressId} = req.body;
+    const userId = req.user.userId;
+    const { addressId } = req.body;
     if (!addressId) {
         return res.status(statusCode.NotFound404).json({
             message: "Address ID is required",
         });
     }
+
+    const existingAddress = await prisma.address.findUnique({
+        where: { id: addressId },
+    });
+
+    if (!existingAddress) {
+        return res.status(statusCode.NotFound404).json({
+            message: "Address not found",
+        });
+    }
+
+    // Ownership check
+    if (existingAddress.userId !== userId) {
+        return res.status(statusCode.Forbidden403).json({
+            message: "You do not own this address",
+        });
+    }
+
     const deletedAddress = await prisma.address.delete({
-        where: {
-            id: addressId,
-        },
+        where: { id: addressId },
     });
     return res.status(statusCode.Ok200).json({
         message: "Address deleted successfully",
         address: deletedAddress,
     });
-})
+});
 
-const getAllAddresses = asyncHandler(async(req, res)=>{
+const getAllAddresses = asyncHandler(async (req, res) => {
     const userId = req.user.userId;
     const isUserIdValid = await checkUserId(userId);
     if (!isUserIdValid) {
@@ -118,14 +136,9 @@ const getAllAddresses = asyncHandler(async(req, res)=>{
     }
 
     const addresses = await prisma.address.findMany({
-        where: {
-            userId: userId
-        },
-        orderBy:{
-            createdAt: 'desc'
-        }
-    })
-
+        where: { userId: userId },
+        orderBy: { createdAt: 'desc' }
+    });
 
     if (!addresses) {
         return res.status(statusCode.NotFound404).json({
@@ -136,7 +149,8 @@ const getAllAddresses = asyncHandler(async(req, res)=>{
         message: "Addresses retrieved successfully",
         addresses: addresses,
     });
-})
+});
+
 export {
     createAddress,
     updateAddress,

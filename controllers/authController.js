@@ -2,8 +2,8 @@ import prisma from "../utils/prisma.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { statusCode } from "../utils/statusCode.js";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes } from "crypto";
+import { sendVerificationMail } from "../utils/emailService.js";
 
 const baseCookieOptions = {
   httpOnly: true,
@@ -84,11 +84,9 @@ const generateTokens = async (
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-  // console.log("data", req.body)
   const { email, password, rememberMe } = req.validateData;
   const normalizedEmail = email.trim().toLowerCase();
 
-  console.log("register email", normalizedEmail);
 
   let existingUser;
   try {
@@ -137,45 +135,32 @@ const registerUser = asyncHandler(async (req, res) => {
     throw e;
   }
 
-  const ua = req.headers["user-agent"] || null;
-  const ip = req.ip || req.connection?.remoteAddress || null;
-  let accessToken, refreshToken, refreshWindowMs;
-  try {
-    const toks = await generateTokens(user, rememberMe, ua, ip);
-    accessToken = toks.accessToken;
-    refreshToken = toks.refreshToken;
-    refreshWindowMs = toks.refreshWindowMs;
-  } catch (e) {
-    if (
-      e?.code === "P2010" ||
-      /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
-    ) {
-      return res
-        .status(statusCode.ServiceUnavailable503)
-        .json({ message: "Database unreachable. Please try again shortly." });
-    }
-    throw e;
-  }
+  // Create email verification token
+  const vToken = randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+  await prisma.verificationToken.create({
+    data: {
+      userId: user.id,
+      token: vToken,
+      type: "EMAIL_VERIFICATION",
+      expiresAt,
+    },
+  });
+
+  // Send email
+  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${vToken}`;
+  await sendVerificationMail({
+    to: user.email,
+    userName: user.firstName,
+    verificationUrl,
+  });
 
   return res
     .status(statusCode.Created201)
-    .cookie("accessToken", accessToken, {
-      ...baseCookieOptions,
-      maxAge: ACCESS_EXP_MS,
-    })
-    .cookie("refreshToken", refreshToken, {
-      ...baseCookieOptions,
-      maxAge: refreshWindowMs,
-    })
-    .cookie("rememberMe", rememberMe ? "true" : "false", {
-      ...baseCookieOptions,
-      httpOnly: false,
-      maxAge: refreshWindowMs,
-    })
     .json({
-      message: "User created successfully",
+      message: "Registration successful. Please check your email to verify your account.",
       user: { id: user.id, email: user.email },
-      expiresIn: ACCESS_EXP_MS / 1000,
     });
 });
 
@@ -195,7 +180,6 @@ const loginUser = asyncHandler(async (req, res) => {
       where: { email: normalizedEmail },
     });
   } catch (e) {
-    console.error("LOGIN: DB Error finding user", e);
     // ... existing error handling
     if (
       e?.code === "P2010" ||
@@ -211,6 +195,13 @@ const loginUser = asyncHandler(async (req, res) => {
   if (!user) {
     return res.status(statusCode.NotFound404).json({
       message: "user with this mail does not exist",
+    });
+  }
+
+  if (!user.isEmailVerified) {
+    return res.status(statusCode.Forbidden403).json({
+      message: "Please verify your email address before logging in.",
+      isVerified: false
     });
   }
 
@@ -232,7 +223,6 @@ const loginUser = asyncHandler(async (req, res) => {
     refreshToken = toks.refreshToken;
     refreshWindowMs = toks.refreshWindowMs;
   } catch (e) {
-    console.error("LOGIN: Error generating tokens", e);
     // ... existing error handling
       if (
       e?.code === "P2010" ||
@@ -245,7 +235,6 @@ const loginUser = asyncHandler(async (req, res) => {
     throw e;
   }
 
-  console.log("LOGIN: Sending response...");
   res
     .status(statusCode.Ok200)
     .cookie("accessToken", accessToken, {
@@ -282,6 +271,14 @@ const loginUser = asyncHandler(async (req, res) => {
             maxAge: LONG_REFRESH_MS,
          });
     }
+
+    // Short-lived flag: tells frontend middleware to skip stealth redirect
+    // after a fresh login. Expires in 10 seconds (auto-cleanup).
+    res.cookie("justLoggedIn", "true", {
+      ...baseCookieOptions,
+      httpOnly: false,
+      maxAge: 10 * 1000,
+    });
 
     return res.json({
       message: "User logged in successfully",
@@ -339,12 +336,12 @@ const logoutUser = asyncHandler(async (req, res) => {
   // Clear frontend-facing stealth cookies
   res.cookie("stealthMode", "", { ...clearOptions, httpOnly: false });
   res.cookie("stealthType", "", { ...clearOptions, httpOnly: false });
-  res.cookie("stealthSession", "", { ...clearOptions, httpOnly: false }); // Add this line
+  res.cookie("stealthSession", "", { ...clearOptions, httpOnly: false });
+  res.cookie("justLoggedIn", "", { ...clearOptions, httpOnly: false });
   res.cookie("stealthMode", "", { ...strictOptions, httpOnly: false });
   res.cookie("stealthType", "", { ...strictOptions, httpOnly: false });
-  res.cookie("stealthSession", "", { ...strictOptions, httpOnly: false }); // Add this line
+  res.cookie("stealthSession", "", { ...strictOptions, httpOnly: false });
 
-  console.log("logged out successfully");
   return res.status(statusCode.Ok200).json({
     message: "user logged out successfully",
   });
@@ -352,12 +349,8 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 
 const onboardUser = asyncHandler(async (req, res) => {
-  // console.log("data", req.validateData)
   const { firstName, lastName, phoneNumber } = req.body;
-  console.log("req", req.user);
   const userId = req.user?.userId;
-  //   console.log("userId before casting:", userId)
-  // console.log("isValidObjectId:", ObjectId.isValid(userId))
   if (!firstName || !lastName || !phoneNumber) {
     return res
       .status(statusCode.BadRequest400)
