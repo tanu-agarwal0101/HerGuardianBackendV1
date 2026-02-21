@@ -11,8 +11,8 @@ router.post("/create-contacts", authMiddleware, validateSchema(EmergencyContacts
 
 router.post("/add-single-contact", authMiddleware, validateSchema(SingleEmergencyContactSchema), addSingleEmergencyContact)
 
-router.patch("/update-emergency-contact",  updateEmergencyContact);
-router.delete("/delete-contact", deleteContact);
+router.patch("/update-emergency-contact", authMiddleware, updateEmergencyContact);
+router.delete("/delete-contact", authMiddleware, deleteContact);
 router.get("/get-all-contacts", authMiddleware, getAllContactsByUserId);
 
 export default router;

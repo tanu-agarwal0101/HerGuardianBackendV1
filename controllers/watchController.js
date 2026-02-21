@@ -7,7 +7,6 @@ const watchPullData = asyncHandler(async (req, res) => {
    const userId = req.user?.userId || req.body.userId;
   const { heartRate, location, fallDetected, triggeredAt } = req.body;
 
-  console.log("📡 Incoming watch data:", req.body);
 
   if (!heartRate || !location?.lat || !location?.lon) {
     return res.status(400).json({ error: "Missing required fields" });

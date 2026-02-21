@@ -14,7 +14,7 @@ function generateTelemetry(userId) {
   const jitterLon = generateRandomBetween(-0.0009, 0.0009);
 
   const heartRate = Math.round(generateRandomBetween(65, 140));
-  const fallDetected = Math.random() > 0.98; // ~2% chance
+  const fallDetected = Math.random() > 0.98;
 
   return {
     userId,
@@ -43,22 +43,15 @@ export function startWatchSimulator(options = {}) {
     const payload = generateTelemetry(userId);
     try {
       await axios.post(url, payload, { timeout: 4000 });
-     
-      console.log("📡 [WatchSimulator] sent:", payload);
-    } catch (err) {
-      console.error(" [WatchSimulator] failed:", err?.message || err);
+    } catch (_err) {
+      // Simulator send failure — non-critical
     }
   }, intervalMs);
-
-  console.log(`✅ Watch simulator started => ${url} every ${intervalMs}ms`);
 }
 
 export function stopWatchSimulator() {
   if (intervalHandle) {
     clearInterval(intervalHandle);
     intervalHandle = null;
-    console.log("🛑 Watch simulator stopped");
   }
 }
-
-

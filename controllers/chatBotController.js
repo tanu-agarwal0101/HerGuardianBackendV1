@@ -1,27 +1,5 @@
 import { CohereClient } from "cohere-ai";
 
-// const cohere = new CohereClient({ token: process.env.COHERE_API_KEY});
-
-// const chatWithBot = async (req, res) => {
-//     try{
-//         const {message} = req.body;
-//         const prompt = `You are Guardian, a safety assistant for women. Answer the following question kindly and helpfully: "${message}"`;
-
-//         const response = await cohere.generate({
-//             model: "command-r-plus",
-//             prompt,
-//             maxTokens: 200,
-//             temperature: 0.7
-//         })
-
-//         const answer = response.generations?.[0]?.text?.trim() || "I'm sorry, I don't know the answer."
-//         res.status(200).json({answer})
-//     } catch(error){
-//         console.error("chatbot error", error)
-//         res.status(500).json({error: "something went wrong"})
-//     }
-// }
-
 const cohere = new CohereClient({ token: process.env.COHERE_API_KEY });
 
 // Provide a prioritized list of Cohere chat-capable models. The removed 'command-r-plus' is excluded.
@@ -61,12 +39,10 @@ export const getBotReply = async (userMessage) => {
   const formattingGuidance = `User question: "${userMessage}"\nInstructions: Be concise, <=200 tokens. New line per bullet. Avoid fluff.`;
 
   try {
-    console.log("chatbot inbound message:", userMessage);
     const errorsPerModel = [];
 
     for (const model of MODEL_CANDIDATES) {
       if (!model) continue;
-      console.log(`[cohere] Trying model: ${model}`);
       // Attempt variant A: single 'message'
       try {
         const single = await cohere.chat({
@@ -77,20 +53,15 @@ export const getBotReply = async (userMessage) => {
         });
         const singleReply = extractReply(single);
         if (singleReply) {
-          console.log(`[cohere] Success (single message) model=${model}`);
           return singleReply;
         } else {
-          console.warn(
-            `[cohere] Empty reply (single form) model=${model}; trying messages[] form.`
-          );
+          // Empty reply — fall through to messages[] variant
         }
       } catch (variantErr) {
         const codeLike = variantErr?.status || variantErr?.code || "n/a";
         const msg =
           variantErr?.message || JSON.stringify(variantErr?.errors || {});
-        console.warn(
-          `[cohere] Single message variant failed model=${model} status=${codeLike} msg=${msg}`
-        );
+
         // If 404 model removed, continue to next model immediately
         if (msg?.includes("was removed") || codeLike === 404) {
           errorsPerModel.push({ model, variant: "single", removed: true, msg });
@@ -112,10 +83,9 @@ export const getBotReply = async (userMessage) => {
         });
         const multiReply = extractReply(multi);
         if (multiReply) {
-          console.log(`[cohere] Success (messages[] form) model=${model}`);
           return multiReply;
         } else {
-          console.warn(`[cohere] Empty reply (messages[] form) model=${model}`);
+
           errorsPerModel.push({
             model,
             variant: "messages",
@@ -125,9 +95,7 @@ export const getBotReply = async (userMessage) => {
       } catch (multiErr) {
         const codeLike = multiErr?.status || multiErr?.code || "n/a";
         const msg = multiErr?.message || JSON.stringify(multiErr?.errors || {});
-        console.warn(
-          `[cohere] messages[] variant failed model=${model} status=${codeLike} msg=${msg}`
-        );
+
         errorsPerModel.push({ model, variant: "messages", msg });
         if (msg?.includes("was removed")) {
           continue; // next model
@@ -135,10 +103,10 @@ export const getBotReply = async (userMessage) => {
       }
     }
 
-    console.error("[cohere] All model candidates failed", errorsPerModel);
+    // All model candidates failed
     return "Sorry, I couldn't generate a response just now.";
   } catch (error) {
-    console.error("Cohere API Error (outer)", error);
+
     return "I am having trouble responding right now.";
   }
 };
