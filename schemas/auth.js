@@ -1,7 +1,4 @@
 import { z } from "zod";
-import { validatePassword } from "../utils/validators.js";
-
-// const passwordSchema = z.string().min(8)
 
 export const registerSchema = z.object({
   email: z.string().min(1, "Email is required").email("Invalid email"),
@@ -23,4 +20,19 @@ export const onboardSchema = z.object({
   phoneNumber: z
     .string()
     .regex(/^[0-9]{10,15}$/, "Phone number must be 10-15 digits"),
+});
+
+export const verifyEmailSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().min(1, "Email is required").email("Invalid email"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1, "Token is required"),
+  newPassword: z
+    .string({ required_error: "Password is required" })
+    .min(8, "Password must be at least 8 characters"),
 });

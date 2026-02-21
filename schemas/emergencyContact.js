@@ -14,5 +14,3 @@ export const EmergencyContactsArraySchema = z.object({
     .array(SingleEmergencyContactSchema)
     .min(1, "At least one contact is required"),
 });
-
-// userId: z.string().length(24),
