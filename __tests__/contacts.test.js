@@ -90,19 +90,23 @@ describe('Contacts routes', () => {
   });
 
   test('PATCH /contacts/update-emergency-contact -> 200 updates existing', async () => {
-    mockPrisma.emergencyContact.findUnique.mockResolvedValueOnce({ id: 'c-1', name: 'Old', phoneNumber: '1' });
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1' });
+    mockPrisma.emergencyContact.findUnique.mockResolvedValueOnce({ id: 'c-1', name: 'Old', phoneNumber: '1', userId: 'user-1' });
     mockPrisma.emergencyContact.update.mockResolvedValueOnce({ id: 'c-1', name: 'New' });
     const res = await request(app)
       .patch('/contacts/update-emergency-contact')
+      .set('Cookie', ['accessToken=mock.jwt'])
       .send({ contactId: 'c-1', name: 'New' });
     expect(res.status).toBe(200);
   });
 
   test('DELETE /contacts/delete-contact -> 200 deletes existing', async () => {
-    mockPrisma.emergencyContact.findUnique.mockResolvedValueOnce({ id: 'c-1' });
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1' });
+    mockPrisma.emergencyContact.findUnique.mockResolvedValueOnce({ id: 'c-1', userId: 'user-1' });
     mockPrisma.emergencyContact.delete.mockResolvedValueOnce({ id: 'c-1' });
     const res = await request(app)
       .delete('/contacts/delete-contact')
+      .set('Cookie', ['accessToken=mock.jwt'])
       .send({ contactId: 'c-1' });
     expect(res.status).toBe(200);
   });

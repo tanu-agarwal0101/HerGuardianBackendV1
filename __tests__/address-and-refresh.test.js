@@ -7,6 +7,7 @@ const mockPrisma = {
   address: {
     create: jest.fn(),
     findMany: jest.fn(),
+    findUnique: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
   },
@@ -77,6 +78,8 @@ describe("Address routes", () => {
   });
 
   test("PATCH /address/update-address -> updates address by id", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: "user-1" });
+    mockPrisma.address.findUnique.mockResolvedValueOnce({ id: "addr-1", userId: "user-1" });
     mockPrisma.address.update.mockResolvedValueOnce({
       id: "addr-1",
       type: "work",
@@ -84,6 +87,7 @@ describe("Address routes", () => {
 
     const res = await request(app)
       .patch("/address/update-address")
+      .set("Cookie", ["accessToken=mock.jwt.token"])
       .send({ addressId: "addr-1", type: "work" });
 
     expect(res.status).toBe(200);
@@ -91,10 +95,13 @@ describe("Address routes", () => {
   });
 
   test("DELETE /address/delete-address -> deletes address by id", async () => {
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: "user-1" });
+    mockPrisma.address.findUnique.mockResolvedValueOnce({ id: "addr-1", userId: "user-1" });
     mockPrisma.address.delete.mockResolvedValueOnce({ id: "addr-1" });
 
     const res = await request(app)
       .delete("/address/delete-address")
+      .set("Cookie", ["accessToken=mock.jwt.token"])
       .send({ addressId: "addr-1" });
 
     expect(res.status).toBe(200);

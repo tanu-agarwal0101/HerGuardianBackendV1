@@ -99,14 +99,14 @@ const registerUser = asyncHandler(async (req, res) => {
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
     ) {
       return res
-        .status(statusCode.ServiceUnavailable503)
+        .status(503)
         .json({ message: "Database unreachable. Please try again shortly." });
     }
     throw e;
   }
   if (existingUser) {
     return res
-      .status(statusCode.Conflict409)
+      .status(409)
       .json({ message: "User already exists" });
   }
   const hashedPassword = await bcrypt.hash(password, 10);
@@ -124,12 +124,12 @@ const registerUser = asyncHandler(async (req, res) => {
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
     ) {
       return res
-        .status(statusCode.ServiceUnavailable503)
+        .status(503)
         .json({ message: "Database unreachable. Please try again shortly." });
     }
     if (e.code === "P2002") {
       return res
-        .status(statusCode.Conflict409)
+        .status(409)
         .json({ message: "User already exists" });
     }
     throw e;
@@ -157,7 +157,7 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   return res
-    .status(statusCode.Created201)
+    .status(201)
     .json({
       message: "Registration successful. Please check your email to verify your account.",
       user: { id: user.id, email: user.email },
@@ -170,7 +170,7 @@ const loginUser = asyncHandler(async (req, res) => {
   
   if (!normalizedEmail || !password) {
     return res
-      .status(statusCode.BadRequest400)
+      .status(400)
       .json({ message: "Email and password are required" });
   }
 
@@ -186,20 +186,20 @@ const loginUser = asyncHandler(async (req, res) => {
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
     ) {
       return res
-        .status(statusCode.ServiceUnavailable503)
+        .status(503)
         .json({ message: "Database unreachable. Please try again shortly." });
     }
     throw e;
   }
 
   if (!user) {
-    return res.status(statusCode.NotFound404).json({
+    return res.status(404).json({
       message: "user with this mail does not exist",
     });
   }
 
   if (!user.isEmailVerified) {
-    return res.status(statusCode.Forbidden403).json({
+    return res.status(403).json({
       message: "Please verify your email address before logging in.",
       isVerified: false
     });
@@ -208,7 +208,7 @@ const loginUser = asyncHandler(async (req, res) => {
   const isPasswordValid = await bcrypt.compare(password, user.password);
   
   if (!isPasswordValid) {
-    return res.status(statusCode.BadRequest400).json({
+    return res.status(400).json({
       message: "Invalid password",
     });
   }
@@ -229,14 +229,14 @@ const loginUser = asyncHandler(async (req, res) => {
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
     ) {
       return res
-        .status(statusCode.ServiceUnavailable503)
+        .status(503)
         .json({ message: "Database unreachable. Please try again shortly." });
     }
     throw e;
   }
 
   res
-    .status(statusCode.Ok200)
+    .status(200)
     .cookie("accessToken", accessToken, {
       ...baseCookieOptions,
       maxAge: ACCESS_EXP_MS,
@@ -342,7 +342,7 @@ const logoutUser = asyncHandler(async (req, res) => {
   res.cookie("stealthType", "", { ...strictOptions, httpOnly: false });
   res.cookie("stealthSession", "", { ...strictOptions, httpOnly: false });
 
-  return res.status(statusCode.Ok200).json({
+  return res.status(200).json({
     message: "user logged out successfully",
   });
 });
@@ -353,14 +353,14 @@ const onboardUser = asyncHandler(async (req, res) => {
   const userId = req.user?.userId;
   if (!firstName || !lastName || !phoneNumber) {
     return res
-      .status(statusCode.BadRequest400)
+      .status(400)
       .json({ message: "All fields are required" });
   }
 
   const phoneRegex = /^[0-9]{10,15}$/;
   if (!phoneRegex.test(phoneNumber)) {
     return res
-      .status(statusCode.BadRequest400)
+      .status(400)
       .json({ message: "Invalid phone number format" });
   }
   const user = await prisma.user.findUnique({
@@ -370,7 +370,7 @@ const onboardUser = asyncHandler(async (req, res) => {
   // where: { id: new ObjectId(userId) },
   if (!user) {
     return res
-      .status(statusCode.NotFound404)
+      .status(404)
       .json({ message: "User not found" });
   }
   //   if (!firstName.trim() || !lastName.trim()) {
@@ -390,7 +390,7 @@ const onboardUser = asyncHandler(async (req, res) => {
   const { password, ...sanitizedUser } = updatedUser;
 
   return res
-    .status(statusCode.Ok200)
+    .status(200)
     .json({ message: "User updated successfully", user: sanitizedUser });
 });
 
@@ -398,7 +398,7 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   const token = req.cookies.refreshToken;
   if (!token)
     return res
-      .status(statusCode.Unauthorized401)
+      .status(401)
       .json({ message: "token not found" });
 
   let existing;
@@ -410,14 +410,14 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
     ) {
       return res
-        .status(statusCode.ServiceUnavailable503)
+        .status(503)
         .json({ message: "Database unreachable. Please try again shortly." });
     }
     throw e;
   }
   if (!existing || existing.revoked)
     return res
-      .status(statusCode.Forbidden403)
+      .status(403)
       .json({ message: "Invalid or revoked refresh token" });
 
   try {
@@ -433,20 +433,20 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
         /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
       ) {
         return res
-          .status(statusCode.ServiceUnavailable503)
+          .status(503)
           .json({ message: "Database unreachable. Please try again shortly." });
       }
       throw e;
     }
     if (!user)
       return res
-        .status(statusCode.NotFound404)
+        .status(404)
         .json({ message: "user not found" });
 
     const now = Date.now();
     if (existing.expiresAt.getTime() < now)
       return res
-        .status(statusCode.Forbidden403)
+        .status(403)
         .json({ message: "refresh expired" });
 
     // Determine new window (sliding for rememberMe)
@@ -471,7 +471,7 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
         /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
       ) {
         return res
-          .status(statusCode.ServiceUnavailable503)
+          .status(503)
           .json({ message: "Database unreachable. Please try again shortly." });
       }
       throw e;
@@ -499,7 +499,7 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
         /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
       ) {
         return res
-          .status(statusCode.ServiceUnavailable503)
+          .status(503)
           .json({ message: "Database unreachable. Please try again shortly." });
       }
       throw e;
@@ -520,14 +520,14 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
         maxAge: newExpiresAt.getTime() - now,
       });
 
-    return res.status(statusCode.Ok200).json({
+    return res.status(200).json({
       accessToken,
       refreshToken: newRefreshToken,
       expiresIn: ACCESS_EXP_MS / 1000,
     });
   } catch (err) {
     return res
-      .status(statusCode.Forbidden403)
+      .status(403)
       .json({ message: "Invalid token" });
   }
 });

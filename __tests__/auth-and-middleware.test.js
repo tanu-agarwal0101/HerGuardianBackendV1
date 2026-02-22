@@ -14,6 +14,9 @@ const mockPrisma = {
     findUnique: jest.fn(),
     create: jest.fn(),
   },
+  verificationToken: {
+    create: jest.fn(),
+  },
 };
 
 await jest.unstable_mockModule('../utils/prisma.js', () => ({
@@ -38,6 +41,12 @@ await jest.unstable_mockModule('jsonwebtoken', () => ({
   default: mockJwt,
 }));
 
+await jest.unstable_mockModule('../utils/emailService.js', () => ({
+  sendSOSMail: jest.fn(async () => {}),
+  sendVerificationMail: jest.fn(async () => {}),
+  sendPasswordResetMail: jest.fn(async () => {}),
+}));
+
 import request from 'supertest';
 const { default: app } = await import('../app.js');
 
@@ -48,10 +57,10 @@ describe('Auth flows and protected route', () => {
     process.env.REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'test-refresh-secret';
   });
 
-  test('POST /users/register -> creates user and returns tokens', async () => {
+  test('POST /users/register -> creates user and sends verification email', async () => {
     mockPrisma.user.findUnique.mockResolvedValueOnce(null);
     mockPrisma.user.create.mockResolvedValueOnce({ id: 'user-1', email: 'user@example.com' });
-    mockPrisma.refreshToken.create.mockResolvedValueOnce({ id: 'rt-1' });
+    mockPrisma.verificationToken.create.mockResolvedValueOnce({ id: 'vt-1' });
 
     const res = await request(app)
       .post('/users/register')
@@ -59,15 +68,15 @@ describe('Auth flows and protected route', () => {
 
     expect(res.status).toBe(201);
     expect(mockPrisma.user.create).toHaveBeenCalled();
-    expect(res.headers['set-cookie']?.join(';')).toContain('accessToken');
-    expect(res.headers['set-cookie']?.join(';')).toContain('refreshToken');
+    expect(mockPrisma.verificationToken.create).toHaveBeenCalled();
   });
 
-  test('POST /users/login -> logs in and returns tokens', async () => {
+  test('POST /users/login -> logs in verified user and returns tokens', async () => {
     mockPrisma.user.findUnique.mockResolvedValueOnce({
       id: 'user-1',
       email: 'user@example.com',
       password: 'hashed-password',
+      isEmailVerified: true,
     });
     mockPrisma.refreshToken.create.mockResolvedValueOnce({ id: 'rt-2' });
 

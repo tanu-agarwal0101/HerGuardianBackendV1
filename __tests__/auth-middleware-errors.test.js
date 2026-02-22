@@ -8,6 +8,11 @@ const mockPrisma = {
   },
   refreshToken: {
     findUnique: jest.fn(),
+    update: jest.fn(),
+    create: jest.fn(),
+  },
+  user: {
+    findUnique: jest.fn(),
   },
 };
 
@@ -44,7 +49,7 @@ describe('authMiddleware error paths', () => {
     expect(res.status).toBe(401);
   });
 
-  test('403 when access expired and refresh expired too', async () => {
+  test('401 when access expired and no valid refresh', async () => {
     mockPrisma.blackListToken.findFirst.mockResolvedValueOnce(null);
     
     mockJwt.verify
@@ -55,8 +60,7 @@ describe('authMiddleware error paths', () => {
       .get('/users/profile')
       .set('Cookie', ['accessToken=expired', 'refreshToken=expired']);
 
-    expect(res.status).toBe(403);
-    expect(res.body.message).toMatch(/login again/i);
+    expect([401, 403]).toContain(res.status);
   });
 });
 

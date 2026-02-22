@@ -5,6 +5,9 @@ const mockPrisma = {
     create: jest.fn(),
     updateMany: jest.fn(),
   },
+  locationLog: {
+    create: jest.fn(),
+  },
   user: {
     findUnique: jest.fn(),
   },
@@ -40,7 +43,9 @@ describe('Timer routes', () => {
 
   test('POST /timer/start -> creates safety timer for valid user', async () => {
     mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1' });
+    mockPrisma.safetyTimer.updateMany.mockResolvedValueOnce({ count: 0 });
     mockPrisma.safetyTimer.create.mockResolvedValueOnce({ id: 'timer-1' });
+    mockPrisma.locationLog.create.mockResolvedValueOnce({});
 
     const res = await request(app)
       .post('/timer/start')
@@ -70,8 +75,11 @@ describe('Watch route', () => {
   });
 
   test('POST /watch/data -> triggers SOS if heart rate high', async () => {
+    mockPrisma.blackListToken.findFirst.mockResolvedValue(null);
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1' });
     const res = await request(app)
       .post('/watch/data')
+      .set('Cookie', ['accessToken=mock.jwt.token'])
       .send({ userId: 'user-1', heartRate: 200, location: { lat: 1.1, lon: 2.2 }, fallDetected: false });
 
     expect(res.status).toBe(200);
@@ -80,8 +88,11 @@ describe('Watch route', () => {
   });
 
   test('POST /watch/data -> 400 on missing fields', async () => {
+    mockPrisma.blackListToken.findFirst.mockResolvedValue(null);
+    mockPrisma.user.findUnique.mockResolvedValueOnce({ id: 'user-1' });
     const res = await request(app)
       .post('/watch/data')
+      .set('Cookie', ['accessToken=mock.jwt.token'])
       .send({ heartRate: 80 });
 
     expect(res.status).toBe(400);
