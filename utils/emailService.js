@@ -4,16 +4,22 @@ import nodemailer from "nodemailer";
 const getTransporter = () => {
   return nodemailer.createTransport({
     host: "smtp.gmail.com",
-    port: 465,
-    secure: true,
+    port: 587,
+    secure: false, // true for 465, false for other ports
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
-    // Add timeouts so it doesn't hang indefinitely (esp. on Render)
+    tls: {
+      rejectUnauthorized: false
+    },
+    // Force IPv4 to prevent Render's IPv6 blackhole hangs
+    family: 4,
+    
+    // Add timeouts so it doesn't hang indefinitely
     connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000, // 10 seconds
-    socketTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
 };
 
