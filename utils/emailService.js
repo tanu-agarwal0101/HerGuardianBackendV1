@@ -1,14 +1,21 @@
 import nodemailer from "nodemailer";
 
-export const sendSOSMail = async ({ to, userName, locationUrl, triggeredAt }) => {
-  const transporter = nodemailer.createTransport({
+// Create a single, global transporter with explicit timeouts to prevent hanging
+const getTransporter = () => {
+  return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS,
     },
+    // Add timeouts so it doesn't hang indefinitely (esp. on Render)
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 10000, // 10 seconds
+    socketTimeout: 10000, // 10 seconds
   });
+};
 
+export const sendSOSMail = async ({ to, userName, locationUrl, triggeredAt }) => {
   const mailOptions = {
     from: `"HerGuardian" <${process.env.EMAIL_USER}>`,
     to,
@@ -20,19 +27,10 @@ export const sendSOSMail = async ({ to, userName, locationUrl, triggeredAt }) =>
     `,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  return info;
+  return await getTransporter().sendMail(mailOptions);
 };
 
 export const sendVerificationMail = async ({ to, userName, verificationUrl }) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
   const mailOptions = {
     from: `"HerGuardian" <${process.env.EMAIL_USER}>`,
     to,
@@ -48,19 +46,10 @@ export const sendVerificationMail = async ({ to, userName, verificationUrl }) =>
     `,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  return info;
+  return await getTransporter().sendMail(mailOptions);
 };
 
 export const sendPasswordResetMail = async ({ to, userName, resetUrl }) => {
-  const transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
-
   const mailOptions = {
     from: `"HerGuardian" <${process.env.EMAIL_USER}>`,
     to,
@@ -76,6 +65,5 @@ export const sendPasswordResetMail = async ({ to, userName, resetUrl }) => {
     `,
   };
 
-  const info = await transporter.sendMail(mailOptions);
-  return info;
+  return await getTransporter().sendMail(mailOptions);
 };
