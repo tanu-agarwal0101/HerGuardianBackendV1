@@ -1,25 +1,16 @@
 import nodemailer from "nodemailer";
 
-// Create a single, global transporter with explicit timeouts to prevent hanging
+// Create a single, global transporter using OAuth2
 const getTransporter = () => {
   return nodemailer.createTransport({
-    host: "smtp.gmail.com",
-    port: 587,
-    secure: false, // true for 465, false for other ports
+    service: "gmail",
     auth: {
+      type: "OAuth2",
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
+      clientId: process.env.OAUTH_CLIENT_ID,
+      clientSecret: process.env.OAUTH_CLIENT_SECRET,
+      refreshToken: process.env.OAUTH_REFRESH_TOKEN,
     },
-    tls: {
-      rejectUnauthorized: false
-    },
-    // Force IPv4 to prevent Render's IPv6 blackhole hangs
-    family: 4,
-    
-    // Add timeouts so it doesn't hang indefinitely
-    connectionTimeout: 10000, // 10 seconds
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
   });
 };
 
