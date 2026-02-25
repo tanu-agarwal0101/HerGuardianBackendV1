@@ -23,7 +23,8 @@ export const onboardSchema = z.object({
 });
 
 export const verifyEmailSchema = z.object({
-  token: z.string().min(1, "Token is required"),
+  email: z.string().email("Invalid email"),
+  otp: z.string().length(6, "OTP must be exactly 6 digits"),
 });
 
 export const forgotPasswordSchema = z.object({

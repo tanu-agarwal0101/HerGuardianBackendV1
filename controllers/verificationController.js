@@ -4,9 +4,10 @@ import { statusCode } from "../utils/statusCode.js";
 import bcrypt from "bcrypt";
 import { randomBytes } from "crypto";
 import { sendVerificationMail, sendPasswordResetMail } from "../utils/emailService.js";
+import { generateTokens, baseCookieOptions, ACCESS_EXP_MS, LONG_REFRESH_MS } from "./authController.js";
 
 const generateToken = async (userId, type) => {
-  const token = randomBytes(32).toString("hex");
+  const token = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
   await prisma.verificationToken.create({
@@ -23,26 +24,39 @@ const generateToken = async (userId, type) => {
 
 // 1. Verify Email Endpoint
 export const verifyEmail = asyncHandler(async (req, res) => {
-  const { token } = req.body;
+  const { email, otp } = req.body;
 
-  if (!token) {
-    return res.status(statusCode.BadRequest400).json({ message: "Token is required" });
+  if (!email || !otp) {
+    return res.status(statusCode.BadRequest400).json({ message: "Email and OTP are required" });
   }
 
-  const verificationToken = await prisma.verificationToken.findUnique({
-    where: { token },
+  const normalizedEmail = email.trim().toLowerCase();
+  const targetUser = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
   });
 
-  if (!verificationToken || verificationToken.type !== "EMAIL_VERIFICATION") {
-    return res.status(statusCode.BadRequest400).json({ message: "Invalid token" });
+  if (!targetUser) {
+    return res.status(statusCode.NotFound404).json({ message: "User not found" });
+  }
+
+  const verificationToken = await prisma.verificationToken.findFirst({
+    where: { 
+      userId: targetUser.id,
+      token: otp,
+      type: "EMAIL_VERIFICATION"
+    },
+  });
+
+  if (!verificationToken) {
+    return res.status(statusCode.BadRequest400).json({ message: "Invalid verification code" });
   }
 
   if (new Date() > verificationToken.expiresAt) {
-    return res.status(statusCode.BadRequest400).json({ message: "Token has expired" });
+    return res.status(statusCode.BadRequest400).json({ message: "Verification code has expired" });
   }
 
   // Update user
-  await prisma.user.update({
+  const user = await prisma.user.update({
     where: { id: verificationToken.userId },
     data: { isEmailVerified: true },
   });
@@ -52,7 +66,35 @@ export const verifyEmail = asyncHandler(async (req, res) => {
     where: { id: verificationToken.id },
   });
 
-  return res.status(statusCode.Ok200).json({ message: "Email verified successfully" });
+  // Auto-login the user so they can jump straight to onboarding
+  let accessToken, refreshToken, refreshWindowMs;
+  try {
+    const toks = await generateTokens(user, false, req.headers["user-agent"], req.ip || req.connection?.remoteAddress);
+    accessToken = toks.accessToken;
+    refreshToken = toks.refreshToken;
+    refreshWindowMs = toks.refreshWindowMs;
+  } catch (e) {
+    if (e?.code === "P2010" || /Server selection timeout/i.test(String(e?.meta?.message || e?.message))) {
+      return res.status(503).json({ message: "Database unreachable. Please try again shortly." });
+    }
+    throw e;
+  }
+
+  res
+    .cookie("accessToken", accessToken, { ...baseCookieOptions, maxAge: ACCESS_EXP_MS })
+    .cookie("refreshToken", refreshToken, { ...baseCookieOptions, maxAge: refreshWindowMs })
+    .cookie("rememberMe", "false", { ...baseCookieOptions, httpOnly: false, maxAge: refreshWindowMs });
+
+  return res.status(statusCode.Ok200).json({ 
+    message: "Email verified successfully",
+    user: {
+      email: user.email,
+      firstName: user.firstName,
+      stealthMode: user.stealthMode,
+      stealthType: user.stealthType,
+    },
+    expiresIn: ACCESS_EXP_MS / 1000,
+  });
 });
 
 // 2. Forgot Password Endpoint
@@ -142,10 +184,9 @@ export const resendVerificationEmail = asyncHandler(async (req, res) => {
       return res.status(statusCode.BadRequest400).json({ message: "Email is already verified" });
   }
 
-  const token = await generateToken(user.id, "EMAIL_VERIFICATION");
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${token}`;
+  const otp = await generateToken(user.id, "EMAIL_VERIFICATION");
   
-  await sendVerificationMail({ to: user.email, userName: user.firstName, verificationUrl });
+  await sendVerificationMail({ to: user.email, userName: user.firstName, otp });
 
   return res.status(statusCode.Ok200).json({ message: "Verification email resent." });
 });

@@ -135,8 +135,8 @@ const registerUser = asyncHandler(async (req, res) => {
     throw e;
   }
 
-  // Create email verification token
-  const vToken = randomBytes(32).toString("hex");
+  // Create 6-digit email verification code
+  const vToken = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
   await prisma.verificationToken.create({
@@ -149,11 +149,10 @@ const registerUser = asyncHandler(async (req, res) => {
   });
 
   // Send email
-  const verificationUrl = `${process.env.FRONTEND_URL}/verify-email?token=${vToken}`;
   await sendVerificationMail({
     to: user.email,
     userName: user.firstName,
-    verificationUrl,
+    otp: vToken,
   });
 
   return res
@@ -538,4 +537,8 @@ export {
   logoutUser,
   onboardUser,
   refreshTokenHandler,
+  generateTokens,
+  baseCookieOptions,
+  ACCESS_EXP_MS,
+  LONG_REFRESH_MS
 };

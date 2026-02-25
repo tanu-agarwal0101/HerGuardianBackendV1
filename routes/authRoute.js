@@ -22,7 +22,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema
 } from "../schemas/auth.js";
-import { authRateLimiter } from "../utils/rateLimiter.js";
+import { authRateLimiter, verifyRateLimiter } from "../utils/rateLimiter.js";
 
 const router = Router();
 router.post("/register", authRateLimiter, validateSchema(registerSchema), registerUser);
@@ -37,9 +37,9 @@ router.patch(
 
 router.post("/refresh-token", refreshTokenHandler);
 
-router.post("/verify-email", authRateLimiter, validateSchema(verifyEmailSchema), verifyEmail);
-router.post("/forgot-password", authRateLimiter, validateSchema(forgotPasswordSchema), forgotPassword);
-router.post("/reset-password", authRateLimiter, validateSchema(resetPasswordSchema), resetPassword);
-router.post("/resend-verification", authRateLimiter, validateSchema(forgotPasswordSchema), resendVerificationEmail);
+router.post("/verify-email", verifyRateLimiter, validateSchema(verifyEmailSchema), verifyEmail);
+router.post("/forgot-password", verifyRateLimiter, validateSchema(forgotPasswordSchema), forgotPassword);
+router.post("/reset-password", verifyRateLimiter, validateSchema(resetPasswordSchema), resetPassword);
+router.post("/resend-verification", verifyRateLimiter, validateSchema(forgotPasswordSchema), resendVerificationEmail);
 
 export default router;

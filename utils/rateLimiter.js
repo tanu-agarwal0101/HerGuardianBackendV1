@@ -14,6 +14,14 @@ export const authRateLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+export const verifyRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 15,
+    message: "Too many verification attempts. Please wait 15 minutes.",
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 export const globalRateLimiter = rateLimit({
     windowMs: 1 * 60 * 1000,
     max: 100,
