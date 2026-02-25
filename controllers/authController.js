@@ -8,12 +8,9 @@ import { sendVerificationMail } from "../utils/emailService.js";
 const baseCookieOptions = {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
-  sameSite: "Lax", // Relaxed for localhost port differences
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
   path: "/",
 };
-// import { ObjectId } from "mongodb";
-
-// Helpers for ms parsing
 const min = (n) => n * 60 * 1000;
 const hr = (n) => n * 60 * 60 * 1000;
 const day = (n) => n * 24 * 60 * 60 * 1000;
@@ -23,10 +20,9 @@ const parseMs = (val, fallback) => {
   if (v.endsWith("m")) return min(num);
   if (v.endsWith("h")) return hr(num);
   if (v.endsWith("d")) return day(num);
-  return num; // assume milliseconds
+  return num; 
 };
 
-// Configurable (with fallbacks)
 const ACCESS_EXP_MS = parseMs(process.env.ACCESS_TOKEN_EXPIRY, "15m");
 const SHORT_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_SHORT_EXPIRY, "2h");
 const LONG_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_LONG_EXPIRY, "30d");
@@ -135,7 +131,7 @@ const registerUser = asyncHandler(async (req, res) => {
     throw e;
   }
 
-  // Create 6-digit email verification code
+
   const vToken = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
 
