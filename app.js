@@ -34,9 +34,14 @@ app.use(
       ? ["http://localhost:3000", "http://127.0.0.1:3000"]
       : (origin, callback) => {
           if (!origin) return callback(null, true);
-          if (corsOrigins.length === 0 || corsOrigins.includes(origin))
-            return callback(null, true);
-          return callback(new Error("Not allowed by CORS"));
+          if (corsOrigins.length === 0) return callback(null, true);
+          
+          // Check origin while ignoring trailing slashes
+          const cleanOrigin = origin.replace(/\/$/, "");
+          const isAllowed = corsOrigins.some((o) => o.replace(/\/$/, "") === cleanOrigin);
+          
+          if (isAllowed) return callback(null, true);
+          return callback(new Error(`Not allowed by CORS: ${origin}`));
         },
     credentials: true,
   })
