@@ -244,6 +244,11 @@ const loginUser = asyncHandler(async (req, res) => {
       ...baseCookieOptions,
       httpOnly: false, // Allow client to read this preference
       maxAge: refreshWindowMs,
+    })
+    .cookie("isAuthenticated", "true", {
+      ...baseCookieOptions,
+      httpOnly: false,
+      maxAge: refreshWindowMs,
     });
 
     // --- Hardening: Manage Stealth Cookies ---
@@ -333,6 +338,7 @@ const logoutUser = asyncHandler(async (req, res) => {
   res.cookie("stealthType", "", { ...clearOptions, httpOnly: false });
   res.cookie("stealthSession", "", { ...clearOptions, httpOnly: false });
   res.cookie("justLoggedIn", "", { ...clearOptions, httpOnly: false });
+  res.cookie("isAuthenticated", "", { ...clearOptions, httpOnly: false });
   res.cookie("stealthMode", "", { ...strictOptions, httpOnly: false });
   res.cookie("stealthType", "", { ...strictOptions, httpOnly: false });
   res.cookie("stealthSession", "", { ...strictOptions, httpOnly: false });
@@ -510,6 +516,11 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
         maxAge: newExpiresAt.getTime() - now,
       })
       .cookie("rememberMe", existing.rememberMe ? "true" : "false", {
+        ...baseCookieOptions,
+        httpOnly: false,
+        maxAge: newExpiresAt.getTime() - now,
+      })
+      .cookie("isAuthenticated", "true", {
         ...baseCookieOptions,
         httpOnly: false,
         maxAge: newExpiresAt.getTime() - now,

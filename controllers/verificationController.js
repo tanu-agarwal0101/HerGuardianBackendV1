@@ -83,7 +83,8 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   res
     .cookie("accessToken", accessToken, { ...baseCookieOptions, maxAge: ACCESS_EXP_MS })
     .cookie("refreshToken", refreshToken, { ...baseCookieOptions, maxAge: refreshWindowMs })
-    .cookie("rememberMe", "false", { ...baseCookieOptions, httpOnly: false, maxAge: refreshWindowMs });
+    .cookie("rememberMe", "false", { ...baseCookieOptions, httpOnly: false, maxAge: refreshWindowMs })
+    .cookie("isAuthenticated", "true", { ...baseCookieOptions, httpOnly: false, maxAge: refreshWindowMs });
 
   return res.status(statusCode.Ok200).json({ 
     message: "Email verified successfully",
