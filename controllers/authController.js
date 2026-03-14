@@ -24,7 +24,7 @@ const parseMs = (val, fallback) => {
 };
 
 const ACCESS_EXP_MS = parseMs(process.env.ACCESS_TOKEN_EXPIRY, "15m");
-const SHORT_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_SHORT_EXPIRY, "2h");
+const SHORT_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_EXPIRY, "24h");
 const LONG_REFRESH_MS = parseMs(process.env.REFRESH_TOKEN_LONG_EXPIRY, "30d");
 const LONG_REFRESH_CAP_MS = parseMs(process.env.REFRESH_TOKEN_LONG_CAP, "90d");
 
