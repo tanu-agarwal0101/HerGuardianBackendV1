@@ -16,8 +16,9 @@ const getAccessToken = async () => {
     });
     return response.data.access_token;
   } catch (err) {
-    console.error("Failed to refresh Gmail access token:", err?.response?.data || err.message);
-    throw new Error("Email Authentication Failed");
+    const googleError = err?.response?.data?.error_description || err?.response?.data?.error || err.message;
+    console.error("Failed to refresh Gmail access token:", googleError);
+    throw new Error(`Email Authentication Failed: ${googleError}`);
   }
 };
 

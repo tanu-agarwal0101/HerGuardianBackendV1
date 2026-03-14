@@ -5,8 +5,8 @@ import { checkUserId } from "../utils/validators.js";
 import { notifyUser } from "../utils/pushToUser.js";
 
 export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
-  if (!lat || !lon) {
-    throw { status: statusCode.BadRequest400, message: "Location is required" };
+  if (lat === undefined || lon === undefined || lat === null || lon === null) {
+    throw { statusCode: statusCode.BadRequest400, message: "Location is required" };
   }
 
   const time = triggeredAt ? new Date(triggeredAt) : new Date();
@@ -26,6 +26,11 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
     include: { emergencyContacts: true },
   });
 
+  const notificationResults = {
+    email: { success: false, message: "No emergency contacts found" },
+    push: { success: false, message: "Not attempted" },
+  };
+
   if (user?.emergencyContacts?.length) {
     const triggeredTime = time.toLocaleString("en-IN", {
       timeZone: "Asia/Kolkata",
@@ -40,25 +45,40 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
     const emails = user.emergencyContacts.map((c) => c.email).filter(Boolean);
     const locationUrl = `https://www.google.com/maps?q=${lat},${lon}`;
 
-    await sendSOSMail({
-      to: emails,
-      userName: user.firstName || "A user",
-      locationUrl,
-      triggeredTime,
-    });
+    if (emails.length > 0) {
+      try {
+        await sendSOSMail({
+          to: emails,
+          userName: user.firstName || "A user",
+          locationUrl,
+          triggeredAt: triggeredTime,
+        });
+        notificationResults.email = { success: true, message: "Emails sent successfully" };
+      } catch (err) {
+        console.error("Failed to send SOS Email:", err.message);
+        notificationResults.email = { success: false, message: err.message || "Failed to send email" };
+      }
+    }
   }
 
-  // Push notification to user's devices (fire-and-forget)
-  notifyUser(userId, {
-    title: "🚨 SOS Alert Triggered",
-    body: "Your emergency contacts have been notified.",
-    url: `https://www.google.com/maps?q=${lat},${lon}`,
-  }).catch(() => {});
+  // Push notification to user's devices
+  try {
+    await notifyUser(userId, {
+      title: "🚨 SOS Alert Triggered",
+      body: "Your emergency contacts have been notified.",
+      url: `https://www.google.com/maps?q=${lat},${lon}`,
+    });
+    notificationResults.push = { success: true, message: "Push notifications sent" };
+  } catch (err) {
+    console.error("Failed to send push notification:", err.message);
+    notificationResults.push = { success: false, message: err.message || "Failed to send push notification" };
+  }
 
   // mark resolved if needed
   await prisma.sOSAlert.update({
     where: { id: sos.id },
     data: { resolved: true },
   });
-  return sos;
+
+  return { sos, notificationResults };
 }

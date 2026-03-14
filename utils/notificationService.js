@@ -1,7 +1,7 @@
 import webpush from "web-push";
 
-let vapidPublic = process.env.VAPID_PUBLIC_KEY || "";
-let vapidPrivate = process.env.VAPID_PRIVATE_KEY || "";
+let vapidPublic = (process.env.VAPID_PUBLIC_KEY || "").replace(/\s/g, "");
+let vapidPrivate = (process.env.VAPID_PRIVATE_KEY || "").replace(/\s/g, "");
 
 export function ensureVapidKeys() {
   if (!vapidPublic || !vapidPrivate) {
@@ -9,11 +9,15 @@ export function ensureVapidKeys() {
     vapidPublic = keys.publicKey;
     vapidPrivate = keys.privateKey;
   }
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:admin@example.com",
-    vapidPublic,
-    vapidPrivate
-  );
+  try {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:admin@example.com",
+      vapidPublic,
+      vapidPrivate
+    );
+  } catch (err) {
+    console.error("Failed to set VAPID details. Push notifications may not work:", err.message);
+  }
 }
 
 export function getVapidPublicKey() {

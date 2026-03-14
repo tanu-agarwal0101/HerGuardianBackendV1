@@ -120,13 +120,37 @@ const sosTrigger = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const { latitude, longitude, triggeredAt, timerId } = req.body || {};
 
-  const sos = await triggerSOS(
+  const { sos, notificationResults } = await triggerSOS(
     userId,
     { lat: latitude, lon: longitude, timerId },
     triggeredAt
   );
 
-  return res.status(statusCode.Created201).json({ message: "sos triggered successfully", sos });
+  const allNotificationsSucceeded = notificationResults.email.success && notificationResults.push.success;
+  const anyNotificationSucceeded = notificationResults.email.success || notificationResults.push.success;
+
+  if (allNotificationsSucceeded) {
+    return res.status(statusCode.Created201).json({ 
+      message: "SOS triggered successfully and contacts notified.", 
+      sos, 
+      notifications: notificationResults 
+    });
+  } else if (anyNotificationSucceeded) {
+    return res.status(statusCode.Ok200).json({ 
+      message: "WARNING: SOS logged, but SOME notifications failed. Your contacts might not have been reached via all channels.", 
+      sos, 
+      notifications: notificationResults,
+      warning: true
+    });
+  } else {
+  
+    return res.status(statusCode.Ok200).json({ 
+      message: "CRITICAL: SOS logged, but ALL notification attempts failed! Please try other means of contact.", 
+      sos, 
+      notifications: notificationResults,
+      error: true
+    });
+  }
 });
 
 const getSOSLogs = asyncHandler(async (req, res) => {
