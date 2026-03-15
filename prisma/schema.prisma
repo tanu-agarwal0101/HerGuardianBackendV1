@@ -66,6 +66,7 @@ model BlackListToken {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   token     String   @unique
   createdAt DateTime @default(now())
+  expiresAt DateTime?
 }
 
 model EmergencyContact {

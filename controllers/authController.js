@@ -188,8 +188,8 @@ const loginUser = asyncHandler(async (req, res) => {
   }
 
   if (!user) {
-    return res.status(404).json({
-      message: "user with this mail does not exist",
+    return res.status(401).json({
+      message: "Invalid email or password",
     });
   }
 
@@ -203,8 +203,8 @@ const loginUser = asyncHandler(async (req, res) => {
   const isPasswordValid = await bcrypt.compare(password, user.password);
   
   if (!isPasswordValid) {
-    return res.status(400).json({
-      message: "Invalid password",
+    return res.status(401).json({
+      message: "Invalid email or password",
     });
   }
 
@@ -304,6 +304,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     await prisma.blackListToken.create({
       data: {
         token: accessToken,
+        expiresAt: new Date(Date.now() + ACCESS_EXP_MS),
       },
     });
   }
@@ -312,6 +313,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     await prisma.blackListToken.create({
       data: {
         token: refreshToken,
+        expiresAt: new Date(Date.now() + LONG_REFRESH_MS),
       },
     });
   }
@@ -416,10 +418,24 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
     }
     throw e;
   }
-  if (!existing || existing.revoked)
+  if (!existing) {
     return res
       .status(403)
-      .json({ message: "Invalid or revoked refresh token" });
+      .json({ message: "Invalid refresh token" });
+  }
+
+  // REUSE DETECTION: A revoked token being presented again means
+  // the old token was likely stolen. Revoke ALL tokens for this user
+  // to force a full re-login on every device.
+  if (existing.revoked) {
+    await prisma.refreshToken.updateMany({
+      where: { userId: existing.userId, revoked: false },
+      data: { revoked: true, revokedAt: new Date() },
+    });
+    return res
+      .status(403)
+      .json({ message: "Refresh token reuse detected. All sessions revoked." });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);

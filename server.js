@@ -6,6 +6,7 @@ import chatBotSocket from "./routes/chatbotRoutes.js";
 import prisma from "./utils/prisma.js";
 import "./jobs/safetyTimerChecker.js";
 import "./jobs/tokenCleanup.js";
+import { startBlacklistCleanupJob } from "./utils/cleanupBlacklist.js";
 import {
   startWatchSimulator,
   stopWatchSimulator,
@@ -50,6 +51,7 @@ chatBotSocket(io);
 
 server.listen(PORT, () => {
   console.log(`Server is running on port http://localhost:${PORT}`);
+  startBlacklistCleanupJob();
   if (process.env.SIMULATE_WATCH === "true") {
     startWatchSimulator();
   }

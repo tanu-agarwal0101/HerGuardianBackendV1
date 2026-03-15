@@ -22,7 +22,7 @@ import {
   forgotPasswordSchema,
   resetPasswordSchema
 } from "../schemas/auth.js";
-import { authRateLimiter, verifyRateLimiter } from "../utils/rateLimiter.js";
+import { authRateLimiter, verifyRateLimiter, refreshRateLimiter } from "../utils/rateLimiter.js";
 
 const router = Router();
 router.post("/register", authRateLimiter, validateSchema(registerSchema), registerUser);
@@ -35,7 +35,7 @@ router.patch(
   onboardUser
 );
 
-router.post("/refresh-token", refreshTokenHandler);
+router.post("/refresh-token", refreshRateLimiter, refreshTokenHandler);
 
 router.post("/verify-email", verifyRateLimiter, validateSchema(verifyEmailSchema), verifyEmail);
 router.post("/forgot-password", verifyRateLimiter, validateSchema(forgotPasswordSchema), forgotPassword);

@@ -14,6 +14,14 @@ export const authRateLimiter = rateLimit({
     legacyHeaders: false,
 });
 
+export const refreshRateLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 20, // Allows normal refresh cycling (15-min access tokens = ~1 refresh/15min); blocks brute-force
+    message: "Too many token refresh attempts. Please wait.",
+    standardHeaders: true,
+    legacyHeaders: false,
+});
+
 export const verifyRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
     max: 15,
