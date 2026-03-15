@@ -4,7 +4,7 @@ import { triggerSOS } from "../utils/triggerSos.js";
 const HEART_RATE_THRESHOLD = 14;
 
 const watchPullData = asyncHandler(async (req, res) => {
-   const userId = req.user?.userId || req.body.userId;
+  const userId = req.user.userId;
   const { heartRate, location, fallDetected, triggeredAt } = req.body;
 
 

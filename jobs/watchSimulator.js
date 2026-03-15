@@ -27,12 +27,13 @@ function generateTelemetry(userId) {
 
 export function startWatchSimulator(options = {}) {
   if (intervalHandle) return; 
-  const {
+    const {
     backendBaseUrl = process.env.BACKEND_BASE_URL || `http://localhost:${process.env.PORT || 5000}`,
     endpointPath = "/watch/data",
     userId = process.env.SIM_USER_ID || "64f8c2c9e3a2d51234abcd90",
     intervalMs = Number(process.env.SIM_INTERVAL_MS || 5000),
     enabled = true,
+    authToken = process.env.SIM_AUTH_TOKEN || null,
   } = options;
 
   if (!enabled) return;
@@ -42,7 +43,14 @@ export function startWatchSimulator(options = {}) {
   intervalHandle = setInterval(async () => {
     const payload = generateTelemetry(userId);
     try {
-      await axios.post(url, payload, { timeout: 4000 });
+      const headers = {};
+      if (authToken) {
+        headers.Authorization = `Bearer ${authToken}`;
+      }
+      await axios.post(url, payload, { 
+        timeout: 4000,
+        headers
+      });
     } catch (_err) {
       // Simulator send failure — non-critical
     }

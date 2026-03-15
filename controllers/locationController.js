@@ -22,7 +22,15 @@ export const logLocation = asyncHandler(async (req, res) => {
     longitude,
     event: eventName,
   };
-  if (timerId) data.timerId = timerId;
+  if (timerId) {
+    const timer = await prisma.safetyTimer.findFirst({
+      where: { id: timerId, userId }
+    });
+    if (!timer) {
+      return res.status(statusCode.NotFound404).json({ message: "Timer not found or not owned by user" });
+    }
+    data.timerId = timerId;
+  }
 
   const created = await prisma.locationLog.create({ data });
   return res.status(statusCode.Created201).json({ location: created });
