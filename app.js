@@ -3,7 +3,8 @@ import cookieParser from "cookie-parser";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
-import morgan from "morgan";
+import pinoHttp from "pino-http";
+import logger from "./utils/logger.js";
 import {
   authRoute,
   addressRoute,
@@ -19,9 +20,8 @@ import { globalRateLimiter } from "./utils/rateLimiter.js";
 
 const app = express();
 app.disable("x-powered-by");
-app.set("trust proxy", 1);
-
 app.use(globalRateLimiter);
+app.use(pinoHttp({ logger }));
 
 const isDev = process.env.NODE_ENV !== "production";
 const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "")
@@ -36,7 +36,6 @@ app.use(
           if (!origin) return callback(null, true);
           if (corsOrigins.length === 0) return callback(null, true);
           
-          // Check origin while ignoring trailing slashes
           const cleanOrigin = origin.replace(/\/$/, "");
           const isAllowed = corsOrigins.some((o) => o.replace(/\/$/, "") === cleanOrigin);
           
@@ -49,9 +48,6 @@ app.use(
 
 app.use(helmet());
 app.use(compression());
-if (process.env.NODE_ENV !== "production") {
-  app.use(morgan("dev"));
-}
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

@@ -53,3 +53,7 @@ build/
 
 # Local overrides
 *.local
+
+
+# text files
+*.txt

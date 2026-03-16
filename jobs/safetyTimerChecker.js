@@ -2,6 +2,7 @@ import Cron from "node-cron";
 import prisma from "../utils/prisma.js";
 import { sendSOSMail } from "../utils/emailService.js";
 import { notifyUser } from "../utils/pushToUser.js";
+import logger from "../utils/logger.js";
 
 let lastDbErrorLogAt = 0;
 const DB_ERROR_LOG_INTERVAL_MS = 5 * 60 * 1000;
@@ -92,8 +93,8 @@ Cron.schedule("* * * * *", async () => {
                         locationUrl: `https://maps.google.com/?q=${timer.latitude || 0},${timer.longitude || 0}`,
                         triggeredAt: timer.expiresAt.toLocaleString(),
                         });
-                    } catch (_e) {
-                        // Email delivery failure — non-critical, continue with remaining contacts
+                    } catch (e) {
+                        logger.error({ err: e, contactId: contact.id, userId: user.id }, "Failed to send SOS email to contact");
                     }
                 }
             }));
@@ -104,13 +105,13 @@ Cron.schedule("* * * * *", async () => {
               body: "Your timer has expired and emergency contacts have been notified.",
               url: `https://maps.google.com/?q=${timer.latitude || 0},${timer.longitude || 0}`,
             }).catch(() => {});
-        } catch (_timerError) {
-            // Timer processing error — continue with remaining timers
+        } catch (timerError) {
+            logger.error({ err: timerError, timerId: timer.id, userId: timer.userId }, "Error processing expired safety timer");
         }
     }));
 
-  } catch (_e) {
-    // Cron cycle error — will retry next minute
+  } catch (e) {
+    logger.error({ err: e }, "Critical failure in safety timer checker cron cycle");
   } finally {
     isJobRunning = false;
   }

@@ -1,3 +1,4 @@
+import logger from "./logger.js";
 import prisma from "../utils/prisma.js";
 import { sendSOSMail } from "../utils/emailService.js";
 import { statusCode } from "../utils/statusCode.js";
@@ -55,7 +56,7 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
         });
         notificationResults.email = { success: true, message: "Emails sent successfully" };
       } catch (err) {
-        console.error("Failed to send SOS Email:", err.message);
+        logger.error({ err, userId }, "Failed to send SOS Email");
         notificationResults.email = { success: false, message: err.message || "Failed to send email" };
       }
     }
@@ -70,7 +71,7 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
     });
     notificationResults.push = { success: true, message: "Push notifications sent" };
   } catch (err) {
-    console.error("Failed to send push notification:", err.message);
+    logger.error({ err, userId }, "Failed to send push notification");
     notificationResults.push = { success: false, message: err.message || "Failed to send push notification" };
   }
 

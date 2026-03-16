@@ -1,18 +1,17 @@
-
 import { PrismaClient } from '@prisma/client';
+import logger from '../utils/logger.js';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('Testing DB connection...');
+  logger.info('Testing DB connection...');
   const start = Date.now();
   try {
     const count = await prisma.user.count();
     const duration = Date.now() - start;
-    console.log(`Connection successful! Found ${count} users.`);
-    console.log(`Query took ${duration}ms`);
+    logger.info({ count, durationMs: duration }, "Connection successful!");
   } catch (e) {
-    console.error('DB Connection failed:', e);
+    logger.error({ err: e }, 'DB Connection failed');
   } finally {
     await prisma.$disconnect();
   }

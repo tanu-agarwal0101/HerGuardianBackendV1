@@ -218,7 +218,7 @@ const loginUser = asyncHandler(async (req, res) => {
     refreshToken = toks.refreshToken;
     refreshWindowMs = toks.refreshWindowMs;
   } catch (e) {
-    // ... existing error handling
+
       if (
       e?.code === "P2010" ||
       /Server selection timeout/i.test(String(e?.meta?.message || e?.message))
@@ -318,7 +318,6 @@ const logoutUser = asyncHandler(async (req, res) => {
     });
   }
 
-  // Manually overwrite cookies to ensure they are cleared
   const clearOptions = {
     ...baseCookieOptions,
     maxAge: 0,
@@ -421,12 +420,9 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
   if (!existing) {
     return res
       .status(403)
-      .json({ message: "Invalid refresh token" });
+      .json({ message: "Invalid or revoked refresh token" });
   }
 
-  // REUSE DETECTION: A revoked token being presented again means
-  // the old token was likely stolen. Revoke ALL tokens for this user
-  // to force a full re-login on every device.
   if (existing.revoked) {
     await prisma.refreshToken.updateMany({
       where: { userId: existing.userId, revoked: false },
@@ -457,8 +453,8 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
     }
     if (!user)
       return res
-        .status(404)
-        .json({ message: "user not found" });
+        .status(403)
+        .json({ message: "Invalid or revoked refresh token" });
 
     const now = Date.now();
     if (existing.expiresAt.getTime() < now)
@@ -466,7 +462,6 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
         .status(403)
         .json({ message: "refresh expired" });
 
-    // Determine new window (sliding for rememberMe)
     let refreshWindowMs = existing.rememberMe
       ? LONG_REFRESH_MS
       : SHORT_REFRESH_MS;
@@ -476,7 +471,6 @@ const refreshTokenHandler = asyncHandler(async (req, res) => {
       if (newExpiresAt.getTime() > capAt) newExpiresAt = new Date(capAt);
     }
 
-    // Revoke old token
     try {
       await prisma.refreshToken.update({
         where: { token },

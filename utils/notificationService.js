@@ -1,3 +1,4 @@
+import logger from "./logger.js";
 import webpush from "web-push";
 
 let vapidPublic = (process.env.VAPID_PUBLIC_KEY || "").replace(/\s/g, "");
@@ -16,7 +17,7 @@ export function ensureVapidKeys() {
       vapidPrivate
     );
   } catch (err) {
-    console.error("Failed to set VAPID details. Push notifications may not work:", err.message);
+    logger.error({ err }, "Failed to set VAPID details. Push notifications may not work");
   }
 }
 

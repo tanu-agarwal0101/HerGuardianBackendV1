@@ -1,9 +1,6 @@
+import logger from "./logger.js";
 import prisma from "./prisma.js";
 
-/**
- * Deletes expired BlackListToken entries from the database.
- * Should be called periodically (e.g. every hour) to prevent unbounded table growth.
- */
 export async function cleanupExpiredBlacklistTokens() {
   try {
     const result = await prisma.blackListToken.deleteMany({
@@ -15,18 +12,18 @@ export async function cleanupExpiredBlacklistTokens() {
       },
     });
     if (result.count > 0) {
-      console.log(`[cleanup] Removed ${result.count} expired blacklist tokens`);
+      logger.info({ count: result.count }, "[cleanup] Removed expired blacklist tokens");
     }
-  } catch (e) {
-    console.error("[cleanup] Failed to clean up blacklist tokens:", e.message);
+  } catch (err) {
+    logger.error({ err }, "[cleanup] Failed to clean up blacklist tokens");
   }
 }
 
 const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 
 export function startBlacklistCleanupJob() {
-  // Run once on startup
+
   cleanupExpiredBlacklistTokens();
-  // Then periodically
+
   setInterval(cleanupExpiredBlacklistTokens, CLEANUP_INTERVAL_MS);
 }

@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import bcrypt from 'bcrypt';
 import { PrismaClient } from '@prisma/client';
+import logger from '../utils/logger.js';
 
 dotenv.config();
 
@@ -23,7 +24,7 @@ async function upsertUser({ email, password, firstName, lastName, phoneNumber })
 }
 
 async function seed() {
-  console.log('Seeding database...');
+  logger.info('Seeding database...');
 
   const usersData = [
     {
@@ -119,16 +120,15 @@ async function seed() {
     });
   }
 
-  console.log('Seeding completed.');
+  logger.info('Seeding completed.');
 }
 
 seed()
   .catch((e) => {
-    console.error('Seed error:', e);
+    logger.error({ err: e }, 'Seed error');
     process.exit(1);
   })
   .finally(async () => {
     await prisma.$disconnect();
   });
-
 

@@ -1,6 +1,5 @@
 import axios from "axios";
-
-let intervalHandle = null;
+import logger from "../utils/logger.js";
 
 function generateRandomBetween(min, max) {
   return Math.random() * (max - min) + min;
@@ -39,6 +38,7 @@ export function startWatchSimulator(options = {}) {
   if (!enabled) return;
 
   const url = `${backendBaseUrl}${endpointPath}`;
+  logger.info({ url, userId, intervalMs }, "Starting watch telemetry simulator");
 
   intervalHandle = setInterval(async () => {
     const payload = generateTelemetry(userId);
@@ -51,8 +51,9 @@ export function startWatchSimulator(options = {}) {
         timeout: 4000,
         headers
       });
-    } catch (_err) {
-      // Simulator send failure — non-critical
+      logger.debug({ userId, heartRate: payload.heartRate }, "Simulator telemetry sent");
+    } catch (err) {
+      logger.error({ err: err.message, url }, "Simulator telemetry send failure");
     }
   }, intervalMs);
 }

@@ -24,3 +24,7 @@ export const updateAddressSchema = z.object({
   country: z.string().optional(),
   radiusMeters: z.number().int().min(0).optional(),
 });
+
+export const deleteAddressSchema = z.object({
+  addressId: z.string().min(1, "Address ID is required"),
+});

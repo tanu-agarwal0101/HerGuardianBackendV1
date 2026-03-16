@@ -1,3 +1,4 @@
+import logger from "./utils/logger.js";
 import app from "./app.js";
 import dotenv from "dotenv";
 import { Server } from "socket.io";
@@ -18,19 +19,6 @@ const PORT = process.env.PORT || 5000;
 
 const server = http.createServer(app);
 
-// const io = new Server(server, {
-//   cors: {
-//     origin: [
-//       "http://localhost:3000",     // your React frontend
-//       "http://10.0.2.2:5000",      // Android emulator API calls
-//       "http://127.0.0.1:5000",     // local loopback
-//       "http://10.144.105.90:5000",   // replace with your LAN IP for physical Android on WiFi
-//     ],
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "DELETE"],
-//   }
-// });
-
 const isDev = process.env.NODE_ENV !== "production";
 const corsOrigins = (process.env.CORS_ORIGINS || process.env.FRONTEND_URL || "")
   .split(",")
@@ -45,12 +33,10 @@ const io = new Server(server, {
   },
 });
 
-// process.env.FRONTEND_URL
-
 chatBotSocket(io);
 
 server.listen(PORT, () => {
-  console.log(`Server is running on port http://localhost:${PORT}`);
+  logger.info({ port: PORT }, "Server is running");
   startBlacklistCleanupJob();
   if (process.env.SIMULATE_WATCH === "true") {
     startWatchSimulator();
@@ -59,21 +45,21 @@ server.listen(PORT, () => {
 
 const shutdown = async (signal) => {
   try {
-    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    logger.info({ signal }, "Received shutdown signal. Shutting down gracefully...");
     stopWatchSimulator();
     server.close(async () => {
-      console.log("HTTP server closed.");
+      logger.info("HTTP server closed.");
       await prisma.$disconnect().catch(() => {});
       process.exit(0);
     });
-    // Force exit if not closed in time
+
     setTimeout(async () => {
       await prisma.$disconnect().catch(() => {});
-      console.warn("Forcing shutdown.");
+      logger.warn("Forcing shutdown after timeout.");
       process.exit(1);
     }, 10_000).unref();
   } catch (err) {
-    console.error("Error during shutdown", err);
+    logger.error({ err }, "Error during shutdown");
     process.exit(1);
   }
 };

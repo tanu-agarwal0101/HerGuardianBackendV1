@@ -1,6 +1,6 @@
+import logger from "./logger.js";
 import axios from "axios";
 
-// Helper to get a fresh Access Token using the Refresh Token
 const getAccessToken = async () => {
   try {
     const response = await axios.post("https://oauth2.googleapis.com/token", null, {
@@ -17,7 +17,7 @@ const getAccessToken = async () => {
     return response.data.access_token;
   } catch (err) {
     const googleError = err?.response?.data?.error_description || err?.response?.data?.error || err.message;
-    console.error("Failed to refresh Gmail access token:", googleError);
+    logger.error({ err }, "Failed to refresh Gmail access token");
     throw new Error(`Email Authentication Failed: ${googleError}`);
   }
 };
@@ -54,7 +54,10 @@ const sendGmailRest = async (to, subject, htmlBody) => {
     );
     return response.data;
   } catch (err) {
-    console.error("Failed to send email via Gmail REST API:", err?.response?.data || err.message);
+    logger.error({ 
+      err, 
+      response: err?.response?.data 
+    }, "Failed to send email via Gmail REST API");
     throw new Error("Failed to send email");
   }
 };

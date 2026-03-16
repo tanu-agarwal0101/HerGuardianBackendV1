@@ -1,4 +1,5 @@
 import axios from "axios";
+import logger from "../utils/logger.js";
 import dotenv from "dotenv";
 dotenv.config();
 
@@ -17,7 +18,7 @@ const getAccessToken = async () => {
     });
     return response.data.access_token;
   } catch (err) {
-    console.error("Failed to refresh Gmail access token:", err?.response?.data || err.message);
+    logger.error({ err: err?.response?.data || err.message }, "Failed to refresh Gmail access token");
     throw new Error("Email Authentication Failed");
   }
 };
@@ -54,22 +55,22 @@ const sendGmailRest = async (to, subject, htmlBody) => {
     );
     return response.data;
   } catch (err) {
-    console.error("Failed to send email via Gmail REST API:", err?.response?.data || err.message);
+    logger.error({ err: err?.response?.data || err.message }, "Failed to send email via Gmail REST API");
     throw new Error("Failed to send email");
   }
 };
 
 async function test() {
   try {
-    console.log("Testing Gmail REST API...");
+    logger.info("Testing Gmail REST API...");
     const res = await sendGmailRest(
       "test@example.com", 
       "Verify your email for HerGuardian", 
       "<b>Test Mail</b>"
     );
-    console.log("Success:", res);
+    logger.info({ res }, "Success");
   } catch(e) {
-    console.log("Error:", e);
+    logger.error({ err: e.message }, "Error during Gmail REST API test");
   }
 }
 test();
