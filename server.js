@@ -4,9 +4,11 @@ import dotenv from "dotenv";
 import { Server } from "socket.io";
 import http from "http";
 import chatBotSocket from "./routes/chatbotRoutes.js";
+import { registerSOSSocketHandlers } from "./sockets/sosSocket.js";
 import prisma from "./utils/prisma.js";
 import "./jobs/safetyTimerChecker.js";
 import "./jobs/tokenCleanup.js";
+import "./jobs/sosSessionExpiry.js";
 import { startBlacklistCleanupJob } from "./utils/cleanupBlacklist.js";
 import {
   startWatchSimulator,
@@ -34,6 +36,7 @@ const io = new Server(server, {
 });
 
 chatBotSocket(io);
+registerSOSSocketHandlers(io);
 
 server.listen(PORT, () => {
   logger.info({ port: PORT }, "Server is running");

@@ -4,6 +4,7 @@ import { sendSOSMail } from "../utils/emailService.js";
 import { statusCode } from "../utils/statusCode.js";
 import { checkUserId } from "../utils/validators.js";
 import { notifyUser } from "../utils/pushToUser.js";
+import { createSOSSession } from "../controllers/sosController.js";
 
 export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
   if (lat === undefined || lon === undefined || lat === null || lon === null) {
@@ -21,6 +22,16 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
       ...(timerId ? { timerId } : {}),
     },
   });
+
+  let trackingSession = null;
+  let trackingUrl = null;
+  try {
+    const result = await createSOSSession(userId);
+    trackingSession = result.session;
+    trackingUrl = result.trackingUrl;
+  } catch (err) {
+    logger.error({ err, userId }, "Failed to create SOS tracking session");
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
@@ -52,6 +63,7 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
           to: emails,
           userName: user.firstName || "A user",
           locationUrl,
+          trackingUrl,  
           triggeredAt: triggeredTime,
         });
         notificationResults.email = { success: true, message: "Emails sent successfully" };
@@ -62,7 +74,6 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
     }
   }
 
-  // Push notification to user's devices
   try {
     await notifyUser(userId, {
       title: "🚨 SOS Alert Triggered",
@@ -81,5 +92,10 @@ export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
     data: { resolved: true },
   });
 
-  return { sos, notificationResults };
+  return {
+    sos,
+    notificationResults,
+    trackingSessionId: trackingSession?.id || null,
+    trackingUrl: trackingUrl || null,
+  };
 }

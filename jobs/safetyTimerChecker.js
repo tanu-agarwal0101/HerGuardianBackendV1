@@ -99,7 +99,7 @@ Cron.schedule("* * * * *", async () => {
                 }
             }));
 
-            // Push notification to user's device (fire-and-forget)
+            
             notifyUser(user.id, {
               title: "⏰ Safety Timer Expired",
               body: "Your timer has expired and emergency contacts have been notified.",

@@ -62,11 +62,25 @@ const sendGmailRest = async (to, subject, htmlBody) => {
   }
 };
 
-export const sendSOSMail = async ({ to, userName, locationUrl, triggeredAt }) => {
+export const sendSOSMail = async ({ to, userName, locationUrl, trackingUrl, triggeredAt }) => {
+  const trackingSection = trackingUrl
+    ? `<p style="margin-top: 15px;">
+        <a href="${trackingUrl}" style="display: inline-block; padding: 12px 24px; background-color: #d10000; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+          📍 Track Live Location
+        </a>
+       </p>
+       <p style="font-size: 0.85em; color: #777;">This link is active for up to 6 hours or until the user marks themselves as safe.</p>`
+    : "";
+
   const html = `
-    <p><strong>${userName}</strong> has triggered an SOS alert.</p>
-    <p>📍 <a href="${locationUrl}">View Location</a></p>
-    <p>Please check on them immediately. SOS was triggered at ${triggeredAt},</p>
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+      <h2 style="color: #d10000;">🚨 SOS Alert from HerGuardian</h2>
+      <p><strong>${userName}</strong> has triggered an emergency SOS alert.</p>
+      <p>📍 <a href="${locationUrl}">View Last Known Location on Map</a></p>
+      ${trackingSection}
+      <p style="margin-top: 15px;">SOS was triggered at: <strong>${triggeredAt}</strong></p>
+      <p style="color: #c00; font-weight: bold;">Please check on them immediately.</p>
+    </div>
   `;
   return await sendGmailRest(to, "SOS Alert from HerGuardian", html);
 };

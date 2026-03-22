@@ -23,6 +23,7 @@ model User {
   sosAlerts          SOSAlert[]
   pushSubscriptions  PushSubscription[]
   locationLogs       LocationLog[]
+  sosTrackingSessions SOSTrackingSession[]
   stealthMode        Boolean             @default(false)
   stealthType        String?
   dashboardPass      String?
@@ -164,6 +165,35 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+model SOSTrackingSession {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String        @db.ObjectId
+  user         User          @relation(fields: [userId], references: [id])
+  token        String        @unique  // Secure public tracking token
+  status       String        @default("active") // active | resolved | expired
+  createdAt    DateTime      @default(now())
+  expiresAt    DateTime                          // Hard expiry (6 hours from creation)
+  lastUpdateAt DateTime?                         // Tracks last location push (for inactivity expiry)
+  locations    SOSLocation[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model SOSLocation {
+  id        String             @id @default(auto()) @map("_id") @db.ObjectId
+  sessionId String             @db.ObjectId
+  session   SOSTrackingSession @relation(fields: [sessionId], references: [id])
+  latitude  Float
+  longitude Float
+  accuracy  Float?             // GPS accuracy in metres
+  speed     Float?             // m/s — used for movement detection
+  timestamp DateTime           @default(now())
+
+  @@index([sessionId])        // Fast breadcrumb history queries
+  @@index([timestamp])
 }
 
 // npx prisma format

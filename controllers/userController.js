@@ -120,7 +120,7 @@ const sosTrigger = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const { latitude, longitude, triggeredAt, timerId } = req.body || {};
 
-  const { sos, notificationResults } = await triggerSOS(
+  const { sos, notificationResults, trackingSessionId } = await triggerSOS(
     userId,
     { lat: latitude, lon: longitude, timerId },
     triggeredAt
@@ -133,14 +133,16 @@ const sosTrigger = asyncHandler(async (req, res) => {
     return res.status(statusCode.Created201).json({ 
       message: "SOS triggered successfully and contacts notified.", 
       sos, 
-      notifications: notificationResults 
+      notifications: notificationResults,
+      trackingSessionId
     });
   } else if (anyNotificationSucceeded) {
     return res.status(statusCode.Ok200).json({ 
       message: "WARNING: SOS logged, but SOME notifications failed. Your contacts might not have been reached via all channels.", 
       sos, 
       notifications: notificationResults,
-      warning: true
+      warning: true,
+      trackingSessionId
     });
   } else {
   
@@ -148,7 +150,8 @@ const sosTrigger = asyncHandler(async (req, res) => {
       message: "CRITICAL: SOS logged, but ALL notification attempts failed! Please try other means of contact.", 
       sos, 
       notifications: notificationResults,
-      error: true
+      error: true,
+      trackingSessionId
     });
   }
 });
@@ -188,7 +191,6 @@ const verifyStealthPin = asyncHandler(async (req, res) => {
     return res.status(statusCode.NotFound404).json({ success: false, message: "User not found" });
   }
 
-  // Check SOS Pin First
   if (user.sosPass) {
     const isSos = await bcrypt.compare(pin, user.sosPass);
     if (isSos) {
@@ -196,7 +198,6 @@ const verifyStealthPin = asyncHandler(async (req, res) => {
     }
   }
 
-  // Check Dashboard Pin
   if (user.dashboardPass) {
     const isDashboard = await bcrypt.compare(pin, user.dashboardPass);
     if (isDashboard) {

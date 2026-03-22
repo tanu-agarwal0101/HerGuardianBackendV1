@@ -2,9 +2,9 @@ import prisma from "../utils/prisma.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { statusCode } from "../utils/statusCode.js";
 import bcrypt from "bcrypt";
-import { randomBytes } from "crypto";
+// import { randomBytes } from "crypto";
 import { sendVerificationMail, sendPasswordResetMail } from "../utils/emailService.js";
-import { generateTokens, baseCookieOptions, ACCESS_EXP_MS, LONG_REFRESH_MS } from "./authController.js";
+import { generateTokens, baseCookieOptions, ACCESS_EXP_MS} from "./authController.js";
 
 const generateToken = async (userId, type) => {
   const token = Math.floor(100000 + Math.random() * 900000).toString();
@@ -22,7 +22,6 @@ const generateToken = async (userId, type) => {
   return token;
 };
 
-// 1. Verify Email Endpoint
 export const verifyEmail = asyncHandler(async (req, res) => {
   const { email, otp } = req.body;
 
@@ -55,18 +54,14 @@ export const verifyEmail = asyncHandler(async (req, res) => {
     return res.status(statusCode.BadRequest400).json({ message: "Verification code has expired" });
   }
 
-  // Update user
   const user = await prisma.user.update({
     where: { id: verificationToken.userId },
     data: { isEmailVerified: true },
   });
-
-  // Delete token
   await prisma.verificationToken.delete({
     where: { id: verificationToken.id },
   });
 
-  // Auto-login the user so they can jump straight to onboarding
   let accessToken, refreshToken, refreshWindowMs;
   try {
     const toks = await generateTokens(user, false, req.headers["user-agent"], req.ip || req.connection?.remoteAddress);
@@ -98,7 +93,6 @@ export const verifyEmail = asyncHandler(async (req, res) => {
   });
 });
 
-// 2. Forgot Password Endpoint
 export const forgotPassword = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
@@ -109,12 +103,10 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   const normalizedEmail = email.trim().toLowerCase();
   const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
-  // For security, don't reveal if user exists or not
   if (!user) {
     return res.status(statusCode.Ok200).json({ message: "If an account with that email exists, a password reset link has been sent." });
   }
 
-  // Generate token and send email
   const token = await generateToken(user.id, "PASSWORD_RESET");
   const resetUrl = `${process.env.FRONTEND_URL}/reset-password?token=${token}`;
   
@@ -123,7 +115,6 @@ export const forgotPassword = asyncHandler(async (req, res) => {
   return res.status(statusCode.Ok200).json({ message: "If an account with that email exists, a password reset link has been sent." });
 });
 
-// 3. Reset Password Endpoint
 export const resetPassword = asyncHandler(async (req, res) => {
   const { token, newPassword } = req.body;
 
@@ -143,21 +134,16 @@ export const resetPassword = asyncHandler(async (req, res) => {
     return res.status(statusCode.BadRequest400).json({ message: "Token has expired" });
   }
 
-  // Hash new password
   const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-  // Update user
   await prisma.user.update({
     where: { id: verificationToken.userId },
     data: { password: hashedPassword },
   });
 
-  // Delete token
   await prisma.verificationToken.delete({
     where: { id: verificationToken.id },
   });
-
-  // Optionally: Delete all active sessions/refresh tokens for security
   await prisma.refreshToken.updateMany({
     where: { userId: verificationToken.userId, revoked: false },
     data: { revoked: true, revokedAt: new Date() }
@@ -166,7 +152,6 @@ export const resetPassword = asyncHandler(async (req, res) => {
   return res.status(statusCode.Ok200).json({ message: "Password reset successfully" });
 });
 
-// 4. Resend Verification Link (Optional but helpful)
 export const resendVerificationEmail = asyncHandler(async (req, res) => {
   const { email } = req.body;
 
