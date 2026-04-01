@@ -109,6 +109,7 @@ const getProfile = asyncHandler(async (req, res) => {
     addresses: user.address,
     contacts: user.emergencyContacts,
     sosTriggers: user.sosAlerts,
+    voiceTriggerPhrase: user.voiceTriggerPhrase,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -208,6 +209,24 @@ const verifyStealthPin = asyncHandler(async (req, res) => {
   return res.status(statusCode.Unauthorized401).json({ success: false, message: "Invalid PIN" });
 });
 
+const updateVoiceSettings = asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+  const { voiceTriggerPhrase } = req.body;
+
+  if (voiceTriggerPhrase === undefined) {
+    return res.status(statusCode.BadRequest400).json({ message: "voiceTriggerPhrase is required" });
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { voiceTriggerPhrase },
+  });
+
+  return res.status(statusCode.Ok200).json({
+    message: "Voice SOS settings updated",
+  });
+});
+
 export {
   updateStealth,
   getProfile,
@@ -215,4 +234,5 @@ export {
   getSOSLogs,
   getStealth,
   verifyStealthPin,
+  updateVoiceSettings,
 };
