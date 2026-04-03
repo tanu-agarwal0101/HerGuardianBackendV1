@@ -103,12 +103,16 @@ const getProfile = asyncHandler(async (req, res) => {
     firstName: user.firstName,
     lastName: user.lastName,
     phoneNumber: user.phoneNumber,
+    location: user.location,
+    bio: user.bio,
     stealthMode: user.stealthMode,
     stealthType: user.stealthType,
     safetyTimer: user.safetyTimer,
     addresses: user.address,
     contacts: user.emergencyContacts,
     sosTriggers: user.sosAlerts,
+    safetyTimers: user.safetyTimers,
+    profilePicture: user.profilePicture,
     voiceTriggerPhrase: user.voiceTriggerPhrase,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
@@ -227,6 +231,57 @@ const updateVoiceSettings = asyncHandler(async (req, res) => {
   });
 });
 
+const updateProfile = asyncHandler(async (req, res) => {
+  const userId = req.user?.userId;
+
+  if (!userId) {
+    return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized" });
+  }
+
+  const { firstName, lastName, phoneNumber, location, bio, profilePicture } = req.body;
+
+  if (phoneNumber !== undefined) {
+    const phoneRegex = /^[0-9]{10,15}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      return res.status(statusCode.BadRequest400).json({
+        message: "Invalid phone number format. Must be 10-15 digits.",
+      });
+    }
+  }
+
+
+  const dataToUpdate = {
+    ...(firstName !== undefined && { firstName: firstName.trim() || undefined }),
+    ...(lastName !== undefined && { lastName: lastName.trim() || undefined }),
+    ...(phoneNumber !== undefined && { phoneNumber }),
+    ...(location !== undefined && { location: location.trim() || null }),
+    ...(bio !== undefined && { bio: bio.trim() || null }),
+    ...(profilePicture !== undefined && { profilePicture: profilePicture.trim() || null }),
+  };
+
+  if (Object.keys(dataToUpdate).length === 0) {
+    return res.status(statusCode.BadRequest400).json({ message: "No fields to update" });
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: dataToUpdate,
+  });
+
+  return res.status(statusCode.Ok200).json({
+    message: "Profile updated successfully",
+    user: {
+      firstName: updatedUser.firstName,
+      lastName: updatedUser.lastName,
+      phoneNumber: updatedUser.phoneNumber,
+      location: updatedUser.location,
+      bio: updatedUser.bio,
+      profilePicture: updatedUser.profilePicture,
+      updatedAt: updatedUser.updatedAt,
+    },
+  });
+});
+
 export {
   updateStealth,
   getProfile,
@@ -235,4 +290,5 @@ export {
   getStealth,
   verifyStealthPin,
   updateVoiceSettings,
+  updateProfile,
 };

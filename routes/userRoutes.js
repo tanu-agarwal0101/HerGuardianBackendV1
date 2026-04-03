@@ -7,6 +7,7 @@ import {
   getStealth,
   verifyStealthPin,
   updateVoiceSettings,
+  updateProfile,
 } from "../controllers/userController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { rateLimiterLib } from "../utils/rateLimiter.js";
@@ -22,6 +23,7 @@ router.get("/stealth-settings", authMiddleware, getStealth);
 router.post("/verify-stealth-pin", rateLimiterLib, authMiddleware, verifyStealthPin);
 
 router.get("/profile", authMiddleware, getProfile);
+router.patch("/update-profile", authMiddleware, updateProfile);
 
 router.post("/sos-trigger", rateLimiterLib, authMiddleware, validateSchema(sosTriggerSchema), sosTrigger);
 

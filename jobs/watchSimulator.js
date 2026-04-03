@@ -1,6 +1,8 @@
 import axios from "axios";
 import logger from "../utils/logger.js";
 
+let intervalHandle = null;
+
 function generateRandomBetween(min, max) {
   return Math.random() * (max - min) + min;
 }
