@@ -9,6 +9,7 @@ import watchRoute from "./watchRoute.js"
 import notificationRoutes from "./notificationRoutes.js"
 import locationRoute from "./locationRoute.js"
 import sosRoute from "./sosRoute.js"
+import excuseRoute from "./excuseRoute.js"
 
 const router = express.Router();
 
@@ -25,5 +26,6 @@ router.use("/", sosRoute)
 export{
     authRoute, addressRoute, contactRoute,
     timerRoute, locationRoute,
-    userRoute, watchRoute, notificationRoutes, sosRoute
+    userRoute, watchRoute, notificationRoutes, sosRoute,
+    excuseRoute
 }
