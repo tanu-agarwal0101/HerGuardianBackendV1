@@ -136,6 +136,28 @@ export function registerSOSSocketHandlers(io) {
       }
     });
 
+    socket.on("location_error", async ({ sessionId, type, message } = {}) => {
+      if (!sessionId) return;
+      
+      try {
+        const session = await prisma.sOSTrackingSession.findUnique({
+          where: { id: sessionId },
+          select: { status: true, expiresAt: true },
+        });
+
+        if (!session || session.status !== "active" || new Date() > session.expiresAt) {
+          logger.warn({ sessionId, type }, "Blocked location error broadcast for inactive session");
+          return;
+        }
+
+        const room = `sos-session-${sessionId}`;
+        io.to(room).emit("location_error", { type, message });
+        logger.warn({ sessionId, type }, "SOS location error reported and broadcast");
+      } catch (err) {
+        logger.error({ err, sessionId }, "Error validating session for location error broadcast");
+      }
+    });
+
     socket.on("disconnect", () => {
       logger.debug({ socketId: socket.id }, "Socket disconnected");
     });

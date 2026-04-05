@@ -62,37 +62,75 @@ const sendGmailRest = async (to, subject, htmlBody) => {
   }
 };
 
-export const sendSOSMail = async ({ to, userName, locationUrl, trackingUrl, triggeredAt }) => {
-  const trackingSection = trackingUrl
+const escapeHtml = (unsafe) => {
+  if (!unsafe) return "";
+  return unsafe
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+};
+
+const escapeAttr = (unsafe) => {
+  if (!unsafe) return "";
+  return unsafe.toString().replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+};
+
+const isValidUrl = (url) => {
+  if (!url) return false;
+  return url.startsWith("http://") || url.startsWith("https://");
+};
+
+export const sendSOSMail = async ({ to, userName, locationUrl, locationDetail, trackingUrl, triggeredAt }) => {
+  const rawUserName = userName || "A user";
+  const safeUserName = escapeHtml(rawUserName);
+  const safeLocationDetail = escapeHtml(locationDetail || "Unknown");
+  const safeTriggeredAt = escapeHtml(triggeredAt);
+  
+  const safeTrackingUrl = isValidUrl(trackingUrl) ? escapeAttr(trackingUrl) : null;
+  const safeLocationUrl = isValidUrl(locationUrl) ? escapeAttr(locationUrl) : null;
+
+  const trackingSection = safeTrackingUrl
     ? `<p style="margin-top: 15px;">
-        <a href="${trackingUrl}" style="display: inline-block; padding: 12px 24px; background-color: #d10000; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
+        <a href="${safeTrackingUrl}" style="display: inline-block; padding: 12px 24px; background-color: #d10000; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">
           📍 Track Live Location
         </a>
        </p>
        <p style="font-size: 0.85em; color: #777;">This link is active for up to 6 hours or until the user marks themselves as safe.</p>`
     : "";
 
+  const locationLink = safeLocationUrl 
+    ? `<p>📍 <a href="${safeLocationUrl}" style="color: #d10000; font-weight: bold;">View Last Known Location on Map</a></p>`
+    : `<p>📍 <strong>Location:</strong> ${safeLocationDetail}</p>`;
+
   const html = `
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; border: 1px solid #ddd; border-radius: 8px;">
       <h2 style="color: #d10000;">🚨 SOS Alert from HerGuardian</h2>
-      <p><strong>${userName}</strong> has triggered an emergency SOS alert.</p>
-      <p>📍 <a href="${locationUrl}">View Last Known Location on Map</a></p>
+      <p style="font-size: 16px;"><strong>${safeUserName}</strong> has triggered an emergency SOS alert.</p>
+      ${locationLink}
       ${trackingSection}
-      <p style="margin-top: 15px;">SOS was triggered at: <strong>${triggeredAt}</strong></p>
-      <p style="color: #c00; font-weight: bold;">Please check on them immediately.</p>
+      <p style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+        SOS was triggered at: <strong>${safeTriggeredAt}</strong>
+      </p>
+      <p style="color: #c00; font-weight: bold; font-size: 18px; margin-top: 10px;">Please check on them immediately.</p>
     </div>
   `;
-  return await sendGmailRest(to, "SOS Alert from HerGuardian", html);
+  return await sendGmailRest(to, `SOS Alert: ${rawUserName} needs help!`, html);
 };
 
 export const sendVerificationMail = async ({ to, userName, otp }) => {
+  const rawUserName = userName || "there";
+  const safeUserName = escapeHtml(rawUserName);
+  const safeOtp = escapeHtml(otp);
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
       <h2 style="color: #6a0dad;">Welcome to HerGuardian!</h2>
-      <p>Hi ${userName || "there"},</p>
+      <p>Hi ${safeUserName},</p>
       <p>Thank you for registering. Please enter the verification code below on the website to activate your account and access all safety features:</p>
       <div style="font-size: 32px; font-weight: bold; letter-spacing: 5px; color: #6a0dad; margin: 25px 0; background: #f3e8fc; padding: 15px; border-radius: 8px; display: inline-block;">
-        ${otp}
+        ${safeOtp}
       </div>
       <p style="margin-top: 20px; font-size: 0.9em; color: #777;">This code expires in 1 hour. If you did not create this account, please ignore this email.</p>
     </div>
@@ -101,12 +139,15 @@ export const sendVerificationMail = async ({ to, userName, otp }) => {
 };
 
 export const sendPasswordResetMail = async ({ to, userName, resetUrl }) => {
+  const rawUserName = userName || "there";
+  const safeUserName = escapeHtml(rawUserName);
+  const safeResetUrl = isValidUrl(resetUrl) ? escapeAttr(resetUrl) : "#";
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
       <h2 style="color: #6a0dad;">Password Reset Request</h2>
-      <p>Hi ${userName || "there"},</p>
+      <p>Hi ${safeUserName},</p>
       <p>We received a request to reset your HerGuardian password. Click the button below to set a new password.</p>
-      <a href="${resetUrl}" style="display: inline-block; padding: 10px 20px; margin-top: 15px; color: white; background-color: #d10000; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
+      <a href="${safeResetUrl}" style="display: inline-block; padding: 10px 20px; margin-top: 15px; color: white; background-color: #d10000; text-decoration: none; border-radius: 5px; font-weight: bold;">Reset Password</a>
       <p style="margin-top: 20px; font-size: 0.9em; color: #777;">This link is valid for 1 hour. If you didn't request a reset, you can safely ignore this email.</p>
     </div>
   `;

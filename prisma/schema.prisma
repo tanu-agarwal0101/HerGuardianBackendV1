@@ -134,8 +134,8 @@ model SOSAlert {
   timerId String? @db.ObjectId
   timer   SafetyTimer? @relation(fields: [timerId], references: [id])
 
-  latitude    Float
-  longitude   Float
+  latitude    Float?
+  longitude   Float?
   triggeredAt DateTime @default(now())
   resolved    Boolean  @default(false)
 
@@ -149,8 +149,8 @@ model LocationLog {
   user      User     @relation(fields: [userId], references: [id])
   timerId   String?  @db.ObjectId
   timer     SafetyTimer? @relation(fields: [timerId], references: [id])
-  latitude  Float
-  longitude Float
+  latitude  Float?
+  longitude Float?
   event     String   @default("snapshot") // started | expired | cancelled | snapshot
   createdAt DateTime @default(now())
 
