@@ -34,6 +34,11 @@ model User {
   voiceTriggerPhrase String?             @default("Activate Emergency")
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
+  role               String?              @default("user") 
+  lastActiveAt       DateTime?            @default(now())
+  linkedGuardians    GuardianLink[]      @relation("UserToGuardian")
+  protectingUsers    GuardianLink[]      @relation("GuardianToUser")
+  deviceStatus       DeviceStatus?
 }
 
 model RefreshToken {
@@ -204,3 +209,35 @@ model SOSLocation {
 // npx prisma reset
 // npx prisma db push
 // npx prisma generate
+
+model GuardianLink {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  guardianId    String?  @db.ObjectId
+  guardianEmail String?
+  guardianPhone String?
+  status        String   @default("pending")
+  token         String   @unique
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation("UserToGuardian", fields: [userId], references: [id])
+  guardian      User?    @relation("GuardianToUser", fields: [guardianId], references: [id])
+
+  @@index([userId])
+  @@index([guardianId])
+  @@index([expiresAt])
+  @@index([status])
+}
+
+model DeviceStatus {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @unique @db.ObjectId
+  user           User     @relation(fields: [userId], references: [id])
+  batteryLevel   Float?
+  isCharging     Boolean  @default(false)
+  isOnline       Boolean  @default(true)
+  connectionType String?
+  updatedAt      DateTime @updatedAt
+}

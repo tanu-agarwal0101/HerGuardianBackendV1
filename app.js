@@ -16,6 +16,7 @@ import {
   notificationRoutes,
   sosRoute,
   excuseRoute,
+  guardianRoute,
 } from "./routes/index.js";
 import { errorHandler } from "./middleware/errorMiddleware.js";
 import { globalRateLimiter } from "./utils/rateLimiter.js";
@@ -80,6 +81,8 @@ app.use("/api/notifications", notificationRoutes);
 app.use("/", locationRoute);
 app.use("/api/sos", sosRoute);
 app.use("/api/chatbot/excuse", excuseRoute);
+app.use("/api/guardian", guardianRoute);
+
 // Global error handler
 
 app.use(errorHandler);

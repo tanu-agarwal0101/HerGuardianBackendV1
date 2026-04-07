@@ -10,6 +10,7 @@ import notificationRoutes from "./notificationRoutes.js"
 import locationRoute from "./locationRoute.js"
 import sosRoute from "./sosRoute.js"
 import excuseRoute from "./excuseRoute.js"
+import guardianRoute from "./guardianRoutes.js"
 
 const router = express.Router();
 
@@ -23,9 +24,4 @@ router.use("/", notificationRoutes)
 router.use("/", locationRoute)
 router.use("/", sosRoute)
 // router.use("/", chatBotSocket)
-export{
-    authRoute, addressRoute, contactRoute,
-    timerRoute, locationRoute,
-    userRoute, watchRoute, notificationRoutes, sosRoute,
-    excuseRoute
-}
+export { authRoute, contactRoute, addressRoute, chatBotSocket, timerRoute, userRoute, watchRoute, notificationRoutes, locationRoute, sosRoute, excuseRoute, guardianRoute };

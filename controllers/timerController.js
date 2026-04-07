@@ -16,8 +16,6 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
       .status(statusCode.BadRequest400)
       .json({ message: "invalid user id" });
   }
-
-  // Deactivate any existing active timers for this user
   await prisma.safetyTimer.updateMany({
     where: { userId, isActive: true },
     data: { isActive: false, status: "cancelled" },
@@ -34,8 +32,6 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
       longitude,
     },
   });
-
-  // Log location snapshot when timer starts
   if (latitude && longitude) {
     await prisma.locationLog.create({
       data: {
@@ -46,7 +42,6 @@ const startSafetyTimer = asyncHandler(async (req, res) => {
         event: "started",
       },
     }).catch(() => {
-      // Ignore location log errors; timer creation is more important
     });
   }
 
@@ -114,4 +109,18 @@ const getTimerDetails = asyncHandler(async (req, res) => {
   });
 });
 
-export { startSafetyTimer, cancelSafetyTimer, getTimerDetails };
+const getActiveSafetyTimer = asyncHandler(async (req, res) => {
+  const userId = req.user?.userId || req.user?.id;
+  if (!userId) {
+  return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized: No user ID" });
+ }
+  const timer = await prisma.safetyTimer.findFirst({
+    where: { userId, isActive: true },
+  });
+
+  return res.status(statusCode.Ok200).json({
+    timer: timer || null,
+  });
+});
+
+export { startSafetyTimer, cancelSafetyTimer, getTimerDetails, getActiveSafetyTimer };

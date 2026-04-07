@@ -29,11 +29,6 @@ export async function createSOSSession(userId) {
   return { session, trackingUrl };
 }
 
-/**
- * GET /api/sos/track/:token
- * Public — validates token and returns session info + last 200 location points.
- * Returns 410 Gone if session has expired/resolved.
- */
 export const getTrackingSession = asyncHandler(async (req, res) => {
   const { token } = req.params;
 
@@ -70,10 +65,6 @@ export const getTrackingSession = asyncHandler(async (req, res) => {
   });
 });
 
-/**
- * POST /api/sos/location
- * Authenticated — REST fallback for location push when WebSocket is unavailable.
- */
 export const pushSOSLocation = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const { sessionId, latitude, longitude, accuracy, speed } = req.body;
@@ -127,10 +118,6 @@ export const pushSOSLocation = asyncHandler(async (req, res) => {
   return res.status(201).json({ message: "Location saved" });
 });
 
-/**
- * POST /api/sos/resolve
- * Authenticated — user marks themselves as safe and closes the session.
- */
 export const resolveSOSSession = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
   const { sessionId } = req.body;
@@ -162,15 +149,18 @@ export const resolveSOSSession = asyncHandler(async (req, res) => {
     data: { status: "resolved" },
   });
 
+
+  await prisma.sOSAlert.updateMany({
+    where: { userId, resolved: false },
+    data: { resolved: true }
+  });
+
   lastRestUpdateTs.delete(sessionId);
-  logger.info({ sessionId, userId }, "SOS session resolved via REST");
-  return res.json({ message: "Session resolved. You are marked as safe." });
+  logger.info({ sessionId, userId }, "SOS session and alerts resolved via REST");
+  return res.json({ message: "Session and alerts resolved. You are marked as safe." });
 });
 
-/**
- * GET /api/sos/active
- * Authenticated — returns the currently active tracking session for the user, if any.
- */
+
 export const getActiveSession = asyncHandler(async (req, res) => {
   const userId = req.user.userId;
 

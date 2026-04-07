@@ -238,7 +238,13 @@ const updateProfile = asyncHandler(async (req, res) => {
     return res.status(statusCode.Unauthorized401).json({ message: "Unauthorized" });
   }
 
-  const { firstName, lastName, phoneNumber, location, bio, profilePicture } = req.body;
+  const { firstName, lastName, phoneNumber, location, bio, profilePicture, role } = req.body;
+
+  if (role && !["user", "guardian", "both"].includes(role)) {
+    return res.status(statusCode.BadRequest400).json({
+      message: "Invalid role selected. Must be 'user', 'guardian', or 'both'.",
+    });
+  }
 
   if (phoneNumber !== undefined) {
     const phoneRegex = /^[0-9]{10,15}$/;

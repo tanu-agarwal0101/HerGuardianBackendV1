@@ -83,8 +83,13 @@ const isValidUrl = (url) => {
   return url.startsWith("http://") || url.startsWith("https://");
 };
 
+const sanitizeHeaderValue = (value, fallback = "") => {
+  if (!value) return fallback;
+  return value.toString().replace(/[\r\n]/g, " ").trim();
+};
+
 export const sendSOSMail = async ({ to, userName, locationUrl, locationDetail, trackingUrl, triggeredAt }) => {
-  const rawUserName = userName || "A user";
+  const rawUserName = sanitizeHeaderValue(userName, "Someone");
   const safeUserName = escapeHtml(rawUserName);
   const safeLocationDetail = escapeHtml(locationDetail || "Unknown");
   const safeTriggeredAt = escapeHtml(triggeredAt);
@@ -121,7 +126,7 @@ export const sendSOSMail = async ({ to, userName, locationUrl, locationDetail, t
 };
 
 export const sendVerificationMail = async ({ to, userName, otp }) => {
-  const rawUserName = userName || "there";
+  const rawUserName = sanitizeHeaderValue(userName, "there");
   const safeUserName = escapeHtml(rawUserName);
   const safeOtp = escapeHtml(otp);
   const html = `
@@ -139,7 +144,7 @@ export const sendVerificationMail = async ({ to, userName, otp }) => {
 };
 
 export const sendPasswordResetMail = async ({ to, userName, resetUrl }) => {
-  const rawUserName = userName || "there";
+  const rawUserName = sanitizeHeaderValue(userName, "there");
   const safeUserName = escapeHtml(rawUserName);
   const safeResetUrl = isValidUrl(resetUrl) ? escapeAttr(resetUrl) : "#";
   const html = `
@@ -152,5 +157,22 @@ export const sendPasswordResetMail = async ({ to, userName, resetUrl }) => {
     </div>
   `;
   return await sendGmailRest(to, "Reset your HerGuardian Password", html);
+};
+
+export const sendGuardianInviteMail = async ({ to, inviterName, inviteUrl }) => {
+  const rawInviterName = sanitizeHeaderValue(inviterName, "Someone");
+  const safeInviterName = escapeHtml(rawInviterName);
+  const safeInviteUrl = isValidUrl(inviteUrl) ? escapeAttr(inviteUrl) : "#";
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+      <h2 style="color: #6a0dad;">Guardian Invitation</h2>
+      <p>Hello!</p>
+      <p><strong>${safeInviterName}</strong> has invited you to be their trusted Guardian on HerGuardian.</p>
+      <p>As their Guardian, you'll be able to receive emergency SOS alerts, check their online status, and view their live location when they need help or start a safety timer.</p>
+      <a href="${safeInviteUrl}" style="display: inline-block; padding: 12px 24px; margin-top: 20px; color: white; background-color: #6a0dad; text-decoration: none; border-radius: 6px; font-weight: bold; font-size: 16px;">Accept Invitation</a>
+      <p style="margin-top: 25px; font-size: 0.85em; color: #777;">This link is secure and valid for 72 hours. If you do not wish to be their Guardian, you can safely ignore this email.</p>
+    </div>
+  `;
+  return await sendGmailRest(to, `${rawInviterName} invited you to be their Guardian`, html);
 };
 

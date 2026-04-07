@@ -98,11 +98,6 @@ const time = triggeredAt ? new Date(triggeredAt) : new Date();
     notificationResults.push = { success: false, message: err.message || "Failed to send push notification" };
   }
 
-  await prisma.sOSAlert.update({
-    where: { id: sos.id },
-    data: { resolved: true },
-  });
-
   return {
     sos,
     notificationResults,
