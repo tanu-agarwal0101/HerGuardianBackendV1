@@ -2,22 +2,23 @@ import { jest } from "@jest/globals";
 
 const mockPrisma = {
   user: {
-    findUnique: jest.fn(),
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
   address: {
-    create: jest.fn(),
-    findMany: jest.fn(),
-    findUnique: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    create: jest.fn().mockImplementation(() => Promise.resolve({})),
+    findMany: jest.fn().mockImplementation(() => Promise.resolve([])),
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
+    delete: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
   blackListToken: {
-    findFirst: jest.fn(),
+    findFirst: jest.fn().mockImplementation(() => Promise.resolve(null)),
   },
   refreshToken: {
-    findUnique: jest.fn(),
-    update: jest.fn(),
-    create: jest.fn(),
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
+    create: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
 };
 

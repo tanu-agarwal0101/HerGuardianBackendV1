@@ -1,13 +1,12 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
 
-const mockPrisma = {
-  user: { findUnique: jest.fn(), create: jest.fn() },
-  refreshToken: { create: jest.fn() },
-  verificationToken: { create: jest.fn() },
-};
+await jest.unstable_mockModule("../utils/prisma.js", async () => {
+  const mockPrismaInstance = (await import("../__mocks__/prisma.js")).default;
+  return { default: mockPrismaInstance };
+});
 
-await jest.unstable_mockModule('../utils/prisma.js', () => ({ default: mockPrisma }));
+import mockPrisma from "../__mocks__/prisma.js";
 
 const mockBcrypt = { hash: jest.fn(async () => 'hashed'), compare: jest.fn(async () => true) };
 await jest.unstable_mockModule('bcrypt', () => ({ default: mockBcrypt }));
@@ -19,6 +18,7 @@ await jest.unstable_mockModule('../utils/emailService.js', () => ({
   sendSOSMail: jest.fn(async () => {}),
   sendVerificationMail: jest.fn(async () => {}),
   sendPasswordResetMail: jest.fn(async () => {}),
+  sendGuardianInviteMail: jest.fn(async () => {}),
 }));
 
 const { default: app } = await import('../app.js');
@@ -41,5 +41,3 @@ describe('Cookie flags on auth', () => {
     expect(res.body.message).toBeDefined();
   });
 });
-
-

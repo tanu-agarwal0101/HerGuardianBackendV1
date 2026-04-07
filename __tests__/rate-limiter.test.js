@@ -3,7 +3,15 @@ jest.mock("../utils/prisma.js");
 import request from 'supertest';
 
 await jest.unstable_mockModule("../utils/prisma.js", async () => {
-  const mockPrisma = (await import("../__mocks__/prisma.js")).default;
+  const mockPrisma = {
+  user: {
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
+  },
+  blackListToken: {
+    findFirst: jest.fn().mockImplementation(() => Promise.resolve(null)),
+  },
+};
   return { default: mockPrisma };
 });
 

@@ -2,19 +2,20 @@ import { jest } from '@jest/globals';
 
 const mockPrisma = {
   emergencyContact: {
-    findMany: jest.fn(),
-    findUnique: jest.fn(),
-    findFirst: jest.fn(),
-    createMany: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    findMany: jest.fn().mockImplementation(() => Promise.resolve([])),
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    findFirst: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    createMany: jest.fn().mockImplementation(() => Promise.resolve({ count: 0 })),
+    create: jest.fn().mockImplementation(() => Promise.resolve({})),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
+    delete: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
   user: {
-    findUnique: jest.fn(),
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
   blackListToken: {
-    findFirst: jest.fn(),
+    findFirst: jest.fn().mockImplementation(() => Promise.resolve(null)),
   },
 };
 

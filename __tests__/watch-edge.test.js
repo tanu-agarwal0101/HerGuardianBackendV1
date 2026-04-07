@@ -1,10 +1,9 @@
 import { jest } from '@jest/globals';
-jest.mock("../utils/prisma.js");
 import request from 'supertest';
 
 await jest.unstable_mockModule("../utils/prisma.js", async () => {
-  const mockPrisma = (await import("../__mocks__/prisma.js")).default;
-  return { default: mockPrisma };
+  const mockPrismaInstance = (await import("../__mocks__/prisma.js")).default;
+  return { default: mockPrismaInstance };
 });
 
 await jest.unstable_mockModule("jsonwebtoken", () => ({
@@ -16,7 +15,6 @@ await jest.unstable_mockModule("jsonwebtoken", () => ({
     }),
   },
 }));
-
 
 import mockPrisma from "../__mocks__/prisma.js";
 
@@ -59,5 +57,3 @@ describe('Watch route edge cases', () => {
     expect(res.status).toBe(400);
   });
 });
-
-

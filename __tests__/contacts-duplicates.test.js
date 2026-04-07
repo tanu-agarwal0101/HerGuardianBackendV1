@@ -2,11 +2,17 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 
 const mockPrisma = {
-  emergencyContact: {
-    findMany: jest.fn(),
+  user: {
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
-  user: { findUnique: jest.fn() },
-  blackListToken: { findFirst: jest.fn() },
+  emergencyContact: {
+    findMany: jest.fn().mockImplementation(() => Promise.resolve([])),
+    createMany: jest.fn().mockImplementation(() => Promise.resolve({ count: 0 })),
+  },
+  blackListToken: {
+    findFirst: jest.fn().mockImplementation(() => Promise.resolve(null)),
+  },
 };
 
 await jest.unstable_mockModule('../utils/prisma.js', () => ({ default: mockPrisma }));

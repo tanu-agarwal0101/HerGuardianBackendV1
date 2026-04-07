@@ -1,53 +1,32 @@
-
 import { jest } from '@jest/globals';
-const mockPrisma = {
-  user: {
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-  },
-  refreshToken: {
-    create: jest.fn(),
-  },
-  blackListToken: {
-    findFirst: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-  },
-  verificationToken: {
-    create: jest.fn(),
-  },
-};
+import request from 'supertest';
 
-await jest.unstable_mockModule('../utils/prisma.js', () => ({
-  default: mockPrisma,
-}));
+await jest.unstable_mockModule("../utils/prisma.js", async () => {
+  const mockPrismaInstance = (await import("../__mocks__/prisma.js")).default;
+  return { default: mockPrismaInstance };
+});
+
+import mockPrisma from "../__mocks__/prisma.js";
 
 const mockBcrypt = {
   hash: jest.fn(async () => 'hashed-password'),
   compare: jest.fn(async () => true),
 };
-
-await jest.unstable_mockModule('bcrypt', () => ({
-  default: mockBcrypt,
-}));
+await jest.unstable_mockModule('bcrypt', () => ({ default: mockBcrypt }));
 
 const mockJwt = {
   sign: jest.fn(() => 'mock.jwt.token'),
   verify: jest.fn(() => ({ userId: 'user-1', email: 'user@example.com' })),
 };
-
-await jest.unstable_mockModule('jsonwebtoken', () => ({
-  default: mockJwt,
-}));
+await jest.unstable_mockModule('jsonwebtoken', () => ({ default: mockJwt }));
 
 await jest.unstable_mockModule('../utils/emailService.js', () => ({
   sendSOSMail: jest.fn(async () => {}),
   sendVerificationMail: jest.fn(async () => {}),
   sendPasswordResetMail: jest.fn(async () => {}),
+  sendGuardianInviteMail: jest.fn(async () => {}),
 }));
 
-import request from 'supertest';
 const { default: app } = await import('../app.js');
 
 describe('Auth flows and protected route', () => {
@@ -117,5 +96,3 @@ describe('Auth flows and protected route', () => {
     expect(res.body?.user?.email).toBe('user@example.com');
   });
 });
-
-

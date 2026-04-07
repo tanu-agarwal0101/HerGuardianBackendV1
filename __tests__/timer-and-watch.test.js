@@ -2,17 +2,18 @@ import { jest } from '@jest/globals';
 
 const mockPrisma = {
   safetyTimer: {
-    create: jest.fn(),
-    updateMany: jest.fn(),
+    create: jest.fn().mockImplementation(() => Promise.resolve({})),
+    updateMany: jest.fn().mockImplementation(() => Promise.resolve({ count: 0 })),
   },
   locationLog: {
-    create: jest.fn(),
+    create: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
   user: {
-    findUnique: jest.fn(),
+    findUnique: jest.fn().mockImplementation(() => Promise.resolve(null)),
+    update: jest.fn().mockImplementation(() => Promise.resolve({})),
   },
   blackListToken: {
-    findFirst: jest.fn(),
+    findFirst: jest.fn().mockImplementation(() => Promise.resolve(null)),
   },
 };
 
