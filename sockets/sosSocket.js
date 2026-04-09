@@ -1,3 +1,4 @@
+import jwt from "jsonwebtoken";
 import logger from "../utils/logger.js";
 import prisma from "../utils/prisma.js";
 
@@ -5,14 +6,25 @@ const lastUpdateTs = new Map();
 const RATE_LIMIT_MS = 3000;    
 
 export function registerSOSSocketHandlers(io) {
+  io.use((socket, next) => {
+    const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+        socket.user = decoded;
+        logger.debug({ socketId: socket.id, userId: decoded.userId }, "Authenticated socket connection");
+      } catch (err) {
+        logger.debug({ socketId: socket.id }, "Socket connection has invalid token");
+      }
+    } else {
+      logger.debug({ socketId: socket.id }, "Anonymous socket connection");
+    }
+    next();
+  });
+
   io.on("connection", (socket) => {
     logger.debug({ socketId: socket.id }, "Socket connected");
 
-    /**
-     * Guardian joins a tracking session room.
-     * Event: join_track
-     * Payload: { token }
-     */
     socket.on("join_track", async ({ token } = {}) => {
       if (!token) {
         socket.emit("track_error", { message: "Token is required" });
@@ -45,11 +57,6 @@ export function registerSOSSocketHandlers(io) {
       }
     });
 
-    /**
-     * SOS user sends a location update.
-     * Event: location_update
-     * Payload: { sessionId, latitude, longitude, accuracy?, speed? }
-     */
     socket.on("location_update", async (payload = {}) => {
       const { sessionId, latitude, longitude, accuracy, speed } = payload;
 
@@ -69,11 +76,17 @@ export function registerSOSSocketHandlers(io) {
         
         const session = await prisma.sOSTrackingSession.findUnique({
           where: { id: sessionId },
-          select: { status: true, expiresAt: true },
+          select: { status: true, expiresAt: true, userId: true },
         });
 
         if (!session || session.status !== "active" || new Date() > session.expiresAt) {
           socket.emit("track_error", { message: "Session is no longer active" });
+          return;
+        }
+
+        if (!socket.user || socket.user.userId !== session.userId) {
+          socket.emit("track_error", { message: "Unauthorized: Only the session owner can broadcast location updates." });
+          logger.warn({ socketId: socket.id, sessionId, userId: socket.user?.userId }, "Unauthorized location update attempt");
           return;
         }
 
@@ -109,11 +122,6 @@ export function registerSOSSocketHandlers(io) {
       }
     });
 
-    /**
-     * SOS user resolves the session ("I am safe").
-     * Event: resolve_sos
-     * Payload: { sessionId }
-     */
     socket.on("resolve_sos", async ({ sessionId } = {}) => {
       if (!sessionId) {
         socket.emit("track_error", { message: "sessionId is required" });
@@ -121,6 +129,21 @@ export function registerSOSSocketHandlers(io) {
       }
 
       try {
+        const session = await prisma.sOSTrackingSession.findUnique({
+          where: { id: sessionId },
+          select: { userId: true }
+        });
+
+        if (!session) {
+          socket.emit("track_error", { message: "Session not found" });
+          return;
+        }
+
+        if (!socket.user || socket.user.userId !== session.userId) {
+          socket.emit("track_error", { message: "Unauthorized: Only the session owner can resolve the SOS." });
+          return;
+        }
+
         await prisma.sOSTrackingSession.update({
           where: { id: sessionId },
           data: { status: "resolved" },
@@ -142,11 +165,16 @@ export function registerSOSSocketHandlers(io) {
       try {
         const session = await prisma.sOSTrackingSession.findUnique({
           where: { id: sessionId },
-          select: { status: true, expiresAt: true },
+          select: { status: true, expiresAt: true, userId: true },
         });
 
         if (!session || session.status !== "active" || new Date() > session.expiresAt) {
           logger.warn({ sessionId, type }, "Blocked location error broadcast for inactive session");
+          return;
+        }
+
+        if (!socket.user || socket.user.userId !== session.userId) {
+          logger.warn({ socketId: socket.id, sessionId, userId: socket.user?.userId }, "Unauthorized location error broadcast attempt");
           return;
         }
 

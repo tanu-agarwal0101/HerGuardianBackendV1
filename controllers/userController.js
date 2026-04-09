@@ -88,6 +88,15 @@ const getProfile = asyncHandler(async (req, res) => {
       emergencyContacts: true,
       safetyTimers: { orderBy: { createdAt: "desc" } },
       sosAlerts: { orderBy: { triggeredAt: "desc" } },
+      linkedGuardians: {
+        include: {
+          guardian: {
+            select: {
+              lastActiveAt: true,
+            },
+          },
+        },
+      },
     },
   });
 
@@ -96,6 +105,24 @@ const getProfile = asyncHandler(async (req, res) => {
       .status(statusCode.NotFound404)
       .json({ message: "User not found" });
   }
+
+  const guardians = user.linkedGuardians || [];
+
+  const activeGuardianCount = guardians.filter(
+    (l) => l.status === "accepted"
+  ).length;
+  const pendingGuardianCount = guardians.filter(
+    (l) => l.status === "pending"
+  ).length;
+
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+  const anyGuardianActiveRecently = guardians.some(
+    (l) =>
+      l.status === "accepted" &&
+      l.guardian &&
+      l.guardian.lastActiveAt &&
+      new Date(l.guardian.lastActiveAt) > fiveMinutesAgo
+  );
 
   const safeUser = {
     id: user.id,
@@ -114,6 +141,11 @@ const getProfile = asyncHandler(async (req, res) => {
     safetyTimers: user.safetyTimers,
     profilePicture: user.profilePicture,
     voiceTriggerPhrase: user.voiceTriggerPhrase,
+    guardianStatus: {
+      activeCount: activeGuardianCount,
+      pendingCount: pendingGuardianCount,
+      anyActiveRecently: anyGuardianActiveRecently,
+    },
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
@@ -288,6 +320,30 @@ const updateProfile = asyncHandler(async (req, res) => {
   });
 });
 
+const updateDeviceStatus = asyncHandler(async (req, res) => {
+  const userId = req.user.userId;
+  const { batteryLevel, isCharging, isOnline, connectionType } = req.body;
+
+  await prisma.deviceStatus.upsert({
+    where: { userId },
+    update: {
+      batteryLevel: batteryLevel !== undefined ? parseFloat(batteryLevel) : undefined,
+      isCharging: isCharging !== undefined ? Boolean(isCharging) : undefined,
+      isOnline: isOnline !== undefined ? Boolean(isOnline) : undefined,
+      connectionType: connectionType || undefined,
+    },
+    create: {
+      userId,
+      batteryLevel: batteryLevel !== undefined ? parseFloat(batteryLevel) : 0,
+      isCharging: isCharging !== undefined ? Boolean(isCharging) : false,
+      isOnline: isOnline !== undefined ? Boolean(isOnline) : true,
+      connectionType: connectionType || "unknown",
+    },
+  });
+
+  return res.status(statusCode.Ok200).json({ message: "Device status updated" });
+});
+
 export {
   updateStealth,
   getProfile,
@@ -297,4 +353,5 @@ export {
   verifyStealthPin,
   updateVoiceSettings,
   updateProfile,
+  updateDeviceStatus,
 };

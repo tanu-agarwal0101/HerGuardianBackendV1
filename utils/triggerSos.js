@@ -1,22 +1,24 @@
 import logger from "./logger.js";
 import prisma from "../utils/prisma.js";
 import { sendSOSMail } from "../utils/emailService.js";
-// import { statusCode } from "../utils/statusCode.js";
-// import { checkUserId } from "../utils/validators.js";
 import { notifyUser } from "../utils/pushToUser.js";
 import { createSOSSession } from "../controllers/sosController.js";
 
 export async function triggerSOS(userId, { lat, lon, timerId }, triggeredAt) {
-const time = triggeredAt ? new Date(triggeredAt) : new Date();
+  const time = triggeredAt ? new Date(triggeredAt) : new Date();
 
-  const parsedLat = (lat != null && lon != null && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon))) ? parseFloat(lat) : null;
-  const parsedLon = (lat != null && lon != null && !isNaN(parseFloat(lat)) && !isNaN(parseFloat(lon))) ? parseFloat(lon) : null;
+  const parsedLat = parseFloat(lat);
+  const parsedLon = parseFloat(lon);
+  const isValidCoords = lat != null && lon != null && !isNaN(parsedLat) && !isNaN(parsedLon);
+
+  const finalLat = isValidCoords ? parsedLat : null;
+  const finalLon = isValidCoords ? parsedLon : null;
 
   const sos = await prisma.sOSAlert.create({
     data: {
       userId,
-      latitude: parsedLat,
-      longitude: parsedLon,
+      latitude: finalLat,
+      longitude: finalLon,
       triggeredAt: time,
       ...(timerId ? { timerId } : {}),
     },
@@ -58,8 +60,8 @@ const time = triggeredAt ? new Date(triggeredAt) : new Date();
     let locationDetail = "Location Unknown";
     let locationUrl = null;
 
-    if (parsedLat != null && parsedLon != null) {
-      locationUrl = `https://www.google.com/maps?q=${parsedLat},${parsedLon}`;
+    if (isValidCoords) {
+      locationUrl = `https://www.google.com/maps?q=${finalLat},${finalLon}`;
       locationDetail = "Live GPS Location";
     } else if (user.location) {
       locationDetail = `Profile Location: ${user.location} (Note: Live coordinates unavailable)`;
@@ -84,13 +86,12 @@ const time = triggeredAt ? new Date(triggeredAt) : new Date();
   }
 
   try {
-    const hasCoords = parsedLat != null && parsedLon != null;
     await notifyUser(userId, {
       title: "🚨 SOS Alert Triggered",
-      body: hasCoords 
+      body: isValidCoords 
         ? "Your emergency contacts have been notified with your live location."
         : "Your emergency contacts have been notified (Live GPS unavailable).",
-      url: hasCoords ? `https://www.google.com/maps?q=${parsedLat},${parsedLon}` : undefined,
+      url: isValidCoords ? `https://www.google.com/maps?q=${finalLat},${finalLon}` : undefined,
     });
     notificationResults.push = { success: true, message: "Push notifications sent" };
   } catch (err) {

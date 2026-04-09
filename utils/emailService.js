@@ -113,12 +113,10 @@ export const sendSOSMail = async ({ to, userName, locationUrl, locationDetail, t
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; border: 1px solid #ddd; border-radius: 8px;">
       <h2 style="color: #d10000;">🚨 SOS Alert from HerGuardian</h2>
-      <p style="font-size: 16px;"><strong>${safeUserName}</strong> has triggered an emergency SOS alert.</p>
-      ${locationLink}
+      <p style="font-size: 16px;"><strong>${safeUserName}</strong> has triggered an emergency SOS alert.</p>      ${locationLink}
       ${trackingSection}
       <p style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
-        SOS was triggered at: <strong>${safeTriggeredAt}</strong>
-      </p>
+        SOS was triggered at: <strong>${safeTriggeredAt}</strong>      </p>
       <p style="color: #c00; font-weight: bold; font-size: 18px; margin-top: 10px;">Please check on them immediately.</p>
     </div>
   `;

@@ -4,6 +4,15 @@ import logger from "../utils/logger.js";
 
 const activityCache = new Map();
 const CACHE_TTL = 5 * 60 * 1000; 
+const ACTIVITY_THROTTLE = 180 * 1000; 
+const PRIORITY_ROUTES = [
+  "/api/sos/location",
+  "/timer/start",
+  "/contacts/create-contacts",
+  "/contacts/add-single-contact",
+  "/contacts/update-emergency-contact"
+];
+
 setInterval(() => {
   const now = Date.now();
   let deletedCount = 0;
@@ -27,9 +36,10 @@ export const activityTracker = async (req, res, next) => {
   const userId = req.user.userId;
   const now = Date.now();
   const lastActive = activityCache.get(userId);
+  
+  const isPriorityRoute = PRIORITY_ROUTES.some(route => req.originalUrl.includes(route));
 
-
-  if (!lastActive || (now - lastActive > 60 * 1000)) {
+  if (isPriorityRoute || !lastActive || (now - lastActive > ACTIVITY_THROTTLE)) {
     
     if (activityCache.size > 10000) {
       const entriesToEvict = Math.ceil(activityCache.size * 0.1);
