@@ -152,7 +152,10 @@ export const resolveSOSSession = asyncHandler(async (req, res) => {
 
   await prisma.sOSAlert.updateMany({
     where: { userId, resolved: false },
-    data: { resolved: true }
+    data: { 
+      resolved: true,
+      resolvedAt: new Date()
+    }
   });
 
   lastRestUpdateTs.delete(sessionId);

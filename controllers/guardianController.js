@@ -253,3 +253,95 @@ export const getSentInvites = asyncHandler(async (req, res) => {
 
   return res.json(links);
 });
+
+export const getUserActivityTimeline = asyncHandler(async (req, res) => {
+  const guardianId = req.user.userId;
+  const { userId } = req.params; 
+  const link = await prisma.guardianLink.findFirst({
+    where: {
+      userId,
+      guardianId,
+      status: "accepted",
+    },
+  });
+
+  if (!link) {
+    return res.status(403).json({ message: "Forbidden. You are not a guardian for this user." });
+  }
+
+  const sosAlerts = await prisma.sOSAlert.findMany({
+    where: { userId },
+    orderBy: { triggeredAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      triggeredAt: true,
+      resolved: true,
+      resolvedAt: true,
+    },
+  });
+
+  const locationLogs = await prisma.locationLog.findMany({
+    where: {
+      userId,
+      event: { not: "snapshot" },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 10,
+    select: {
+      id: true,
+      event: true,
+      createdAt: true,
+    },
+  });
+
+  const events = [];
+
+  sosAlerts.forEach((sos) => {
+    events.push({
+      id: `sos-${sos.id}`,
+      type: "sos_trigger",
+      message: "Emergency SOS Triggered",
+      timestamp: sos.triggeredAt,
+      severity: "critical",
+    });
+    if (sos.resolved) {
+      events.push({
+        id: `sos-resolve-${sos.id}`,
+        type: "sos_resolve",
+        message: "SOS Alert Resolved",
+        timestamp: sos.resolvedAt ?? sos.triggeredAt,
+        severity: "safe",
+      });
+    }
+  });
+
+  locationLogs.forEach((log) => {
+    let message = "Safety Event";
+    let severity = "info";
+
+    if (log.event === "started") {
+      message = "Safety Timer started";
+    } else if (log.event === "expired") {
+      message = "Safety Timer expired (SOS triggered)";
+      severity = "warning";
+    } else if (log.event === "cancelled") {
+      message = "Safety Timer stopped (Safe)";
+      severity = "safe";
+    }
+
+    events.push({
+      id: `log-${log.id}`,
+      type: log.event,
+      message,
+      timestamp: log.createdAt,
+      severity,
+    });
+  });
+
+  const sortedEvents = events
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 10);
+
+  return res.json(sortedEvents);
+});

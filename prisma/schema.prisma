@@ -143,6 +143,7 @@ model SOSAlert {
   longitude   Float?
   triggeredAt DateTime @default(now())
   resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
 
   @@index([userId])
   @@index([timerId])

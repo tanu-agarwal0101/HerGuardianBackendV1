@@ -7,7 +7,8 @@ import {
   rejectInvite,
   revokeLink,
   getGuardianDashboardUsers,
-  getSentInvites
+  getSentInvites,
+  getUserActivityTimeline
 } from "../controllers/guardianController.js";
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.get("/invite/check", checkInviteToken);
 router.patch("/reject", rejectInvite); 
 router.patch("/accept", authMiddleware, acceptInvite); 
 router.get("/dashboard", authMiddleware, getGuardianDashboardUsers);
+router.get("/activity/:userId", authMiddleware, getUserActivityTimeline);
 
 export default router;
